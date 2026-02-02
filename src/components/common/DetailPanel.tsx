@@ -13,6 +13,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { cn } from '@/lib/utils';
 
 interface DetailPanelProps {
   open: boolean;
@@ -44,12 +45,14 @@ export function DetailPanel({
   if (type === 'dialog') {
     return (
       <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-        <DialogContent className={sizeClasses[size]}>
-          <DialogHeader>
+        <DialogContent className={cn(sizeClasses[size], 'max-h-[90vh] flex flex-col p-0 gap-0')}>
+          <DialogHeader className="shrink-0 px-6 pt-6 pb-4">
             <DialogTitle>{title}</DialogTitle>
             {description && <DialogDescription>{description}</DialogDescription>}
           </DialogHeader>
-          {children}
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">
+            {children}
+          </div>
         </DialogContent>
       </Dialog>
     );

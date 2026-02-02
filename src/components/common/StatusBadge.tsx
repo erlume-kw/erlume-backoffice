@@ -1,6 +1,40 @@
 import { cn } from '@/lib/utils';
 
-type StatusType = 'active' | 'inactive' | 'pending' | 'approved' | 'suspended' | 'completed' | 'cancelled' | 'draft' | 'sold' | 'archived' | 'processing' | 'shipped' | 'delivered' | 'refunded' | 'confirmed' | 'failed' | 'open' | 'fulfilled' | 'closed' | 'rejected' | 'scheduled' | 'ended' | 'new' | 'like_new' | 'good' | 'fair';
+type StatusType =
+  | 'active'
+  | 'inactive'
+  | 'pending'
+  | 'approved'
+  | 'suspended'
+  | 'completed'
+  | 'cancelled'
+  | 'draft'
+  | 'sold'
+  | 'archived'
+  | 'processing'
+  | 'shipped'
+  | 'delivered'
+  | 'refunded'
+  | 'confirmed'
+  | 'failed'
+  | 'open'
+  | 'fulfilled'
+  | 'closed'
+  | 'rejected'
+  | 'scheduled'
+  | 'upcoming'
+  | 'ended'
+  | 'returned'
+  | 'partially_refunded'
+  | 'new'
+  | 'like_new'
+  | 'gently_used'
+  | 'fair_condition'
+  | 'worn_condition'
+  | 'good'
+  | 'fair'
+  | 'available'
+  | 'out_of_stock';
 
 interface StatusBadgeProps {
   status: StatusType | string;
@@ -15,13 +49,16 @@ const statusStyles: Record<string, string> = {
   delivered: 'status-active',
   fulfilled: 'status-active',
   confirmed: 'status-active',
+  available: 'status-active',
   
   // Pending/Warning states
   pending: 'status-pending',
   processing: 'status-pending',
   shipped: 'status-pending',
   scheduled: 'status-pending',
+  upcoming: 'status-pending',
   open: 'status-pending',
+  partially_refunded: 'status-pending',
   
   // Inactive/Muted states
   inactive: 'status-inactive',
@@ -29,6 +66,8 @@ const statusStyles: Record<string, string> = {
   archived: 'status-inactive',
   closed: 'status-inactive',
   ended: 'status-inactive',
+  out_of_stock: 'status-inactive',
+  sold: 'status-inactive',
   
   // Error/Destructive states
   suspended: 'status-error',
@@ -36,11 +75,14 @@ const statusStyles: Record<string, string> = {
   refunded: 'status-error',
   failed: 'status-error',
   rejected: 'status-error',
+  returned: 'status-error',
   
   // Special states
-  sold: 'bg-primary/20 text-primary',
   new: 'bg-success/20 text-success',
   like_new: 'bg-success/15 text-success',
+  gently_used: 'bg-chart-3/20 text-chart-3',
+  fair_condition: 'bg-warning/20 text-warning',
+  worn_condition: 'bg-destructive/15 text-destructive',
   good: 'bg-chart-3/20 text-chart-3',
   fair: 'bg-warning/20 text-warning',
 };

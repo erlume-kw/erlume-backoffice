@@ -1,0 +1,96 @@
+{
+  "title": "Orders, Transactions, Income & Sales — How They Work Together",
+  "description": "Process flow, relationships, auto-populate and auto-calculate rules for the backoffice.",
+  "entities": {
+    "Order": {
+      "role": "The basket: what the customer bought, from whom, when.",
+      "keyFields": ["order lines (items)", "order total", "status", "customer", "seller", "date"],
+      "statusFlow": ["pending", "paid", "fulfilled", "cancelled"]
+    },
+    "Transaction": {
+      "role": "A payment event: money in/out tied to an order.",
+      "keyFields": ["order_id", "amount", "status", "payment method", "discount", "currency"],
+      "relationship": "One order can have multiple transactions (e.g. partial payments, refunds)."
+    },
+    "Sale": {
+      "role": "The closed deal: we sold this order for this amount.",
+      "keyFields": ["order_id", "amount", "invoice_number", "invoice_url", "payment_evidence_url", "date"],
+      "relationship": "Usually created when payment is completed (from Transaction)."
+    },
+    "Income": {
+      "role": "Money received by the business (P&L, reporting).",
+      "keyFields": ["amount", "currency", "income_type", "platform", "received_at", "source"],
+      "relationship": "Created from completed Transactions or Sales (e.g. sale, fee)."
+    }
+  },
+  "flow": {
+    "sequence": [
+      "Order (pending) — customer places order",
+      "Customer pays → Transaction created (order_id, amount, status = completed)",
+      "When Transaction is completed → Sale can be auto-created (order_id, amount, invoice)",
+      "Income record(s) auto-created from Transaction/Sale (amount, type = sale or fee)"
+    ],
+    "diagram": "Order → Transaction (payment) → Sale (invoice) → Income (money in)"
+  },
+  "autoPopulate": {
+    "Transaction_from_Order": {
+      "when": "User selects an Order when creating/editing a Transaction",
+      "defaults": {
+        "order_id": "from selected order",
+        "amount": "from order total (or remaining to pay)",
+        "optional": "customer/seller/date from order for display or pre-fill"
+      }
+    },
+    "Sale_from_Order_or_Transaction": {
+      "when": "User selects an Order or a completed Transaction when creating a Sale",
+      "defaults": {
+        "order_id": "from order or transaction",
+        "amount": "from completed transaction amount or order total"
+      }
+    },
+    "Income_from_Transaction_or_Sale": {
+      "when": "Creating Income from a Transaction or Sale",
+      "defaults": {
+        "amount": "from transaction or sale amount",
+        "received_at": "from transaction/sale date",
+        "income_type": "e.g. sale or fee"
+      }
+    }
+  },
+  "autoCalculate": {
+    "orderTotal": {
+      "description": "Order total from line items",
+      "formula": "order_total = sum(item_price * quantity) - order_discount",
+      "usage": "Default Transaction amount and Sale amount from this."
+    },
+    "transactionAmount": {
+      "description": "For a single full payment",
+      "formula": "transaction_amount = order_total - order_discount",
+      "partialPayments": "remaining = order_total - sum(transactions for this order); default next transaction to remaining."
+    },
+    "saleAmount": {
+      "description": "Sale amount from completed payment",
+      "formula": "sale_amount = completed_transaction.amount (or order total if single payment)",
+      "invoiceNumber": "Auto-generate (e.g. sequence or date-based) when creating Sale from Transaction."
+    },
+    "incomeFromTransaction": {
+      "description": "When a Transaction is marked completed",
+      "action": "Create Income record: amount = transaction.amount, income_type = 'sale', received_at = transaction date."
+    },
+    "incomeFromSale": {
+      "description": "When a Sale is confirmed",
+      "action": "Create Income record: amount = sale.amount, income_type = 'sale'."
+    },
+    "feeIncome": {
+      "description": "Platform fee (e.g. % of sale)",
+      "formula": "fee_income = sale_amount * fee_rate",
+      "action": "Create Income record: amount = fee_income, income_type = 'fee'."
+    }
+  },
+  "summary": {
+    "Order": "Defines what was sold and the total; everything else references it (order_id).",
+    "Transaction": "Records payment(s) for that order; amount defaults from order; when status = completed, auto-create Sale and Income.",
+    "Sale": "Formal record of a completed sale; defaults from Order + Transaction; can auto-set amount and invoice number.",
+    "Income": "Money in; created from completed Transactions (or Sales), amount and income_type auto-set; optional fee calculation from sale amount."
+  }
+}

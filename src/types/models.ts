@@ -1,276 +1,269 @@
 // Core model types for the marketplace
 
+export interface Address {
+	street: string;
+	city: string;
+	block: string;
+	governorate: string;
+	house: string;
+	flat?: string;
+}
+
 export interface User {
-  _id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  phone?: string;
-  avatar?: string;
-  role: 'admin' | 'user';
-  status: 'active' | 'inactive' | 'suspended' | 'pending';
-  createdAt: string;
-  updatedAt: string;
-  deletedAt?: string;
+	_id: string;
+	username?: string;
+	password: string;
+	emailAddress: string;
+	phoneNumber: string;
+	address: Address;
+	roles: string[];
+	cardIds: string[];
+	isDeleted: boolean;
+	createdAt: string;
+	updatedAt: string;
 }
 
 export interface Seller {
-  _id: string;
-  userId: string;
-  user?: User;
-  businessName: string;
-  description?: string;
-  logo?: string;
-  status: 'pending' | 'approved' | 'suspended';
-  rating: number;
-  totalSales: number;
-  commissionRate: number;
-  createdAt: string;
-  updatedAt: string;
+	_id: string;
+	userId: string;
+	balance: number;
+	itemIds: string[];
+	IBAN: string;
+	qrCode: string;
+	isDeactivated: boolean;
+	consentGiven?: boolean;
+	preferredPickupDate?: string;
+	sellerPolicyAcceptedAt?: string;
+	escalationStatus?: string;
+	escalationNotes?: string;
+	createdAt: string;
+	updatedAt: string;
 }
 
 export interface Category {
-  _id: string;
-  name: string;
-  slug: string;
-  description?: string;
-  image?: string;
-  parentId?: string;
-  order: number;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+	_id: string;
+	name: string;
+	base_rate: number;
+	op_rate?: number;
+	clean_rate?: number;
+	sub_category_id?: string;
 }
 
 export interface SubCategory {
-  _id: string;
-  name: string;
-  slug: string;
-  categoryId: string;
-  category?: Category;
-  description?: string;
-  order: number;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+	_id: string;
+	sub_cat_name: string;
+	category_id: string;
+	demand_id?: string;
+	sub_clean_rate: number;
 }
 
 export interface Item {
-  _id: string;
-  sellerId: string;
-  seller?: Seller;
-  categoryId: string;
-  category?: Category;
-  subCategoryId?: string;
-  subCategory?: SubCategory;
-  dropId?: string;
-  drop?: Drop;
-  title: string;
-  description: string;
-  brand?: string;
-  size?: string;
-  color?: string;
-  condition: 'new' | 'like_new' | 'good' | 'fair';
-  originalPrice: number;
-  price: number;
-  images: string[];
-  status: 'draft' | 'pending' | 'active' | 'sold' | 'archived';
-  views: number;
-  likes: number;
-  createdAt: string;
-  updatedAt: string;
+	_id: string;
+	basePrice: string;
+	condition: string;
+	uploadedAt: string;
+	saleRate: string;
+	itemStatus: string;
+	color: string;
+	size: string;
+	itemName: string;
+	itemModel?: string;
+	year?: string;
+	quantity: string;
+	brandName: string;
+	imageUrls: string[];
+	receiptPhotoUrls?: string[];
+	priceEstimatorUrls?: string[];
+	quoteUrls?: string[];
+	approved?: boolean;
+	approvedNextDrop?: boolean;
+	orderId?: string;
+	authNeeded?: boolean;
+	cleaningNeeded?: boolean;
+	listingPrice?: string;
+	photographed?: boolean;
+	authenticationStatus?: string;
+	authenticatedAt?: string;
+	returnDate?: string;
+	returnStatus?: string;
+	seller_id?: string;
+	category_id: string;
+	sub_category_id?: string;
+	drop_id?: string;
+	createdAt?: string;
+	updatedAt?: string;
 }
 
 export interface Drop {
-  _id: string;
-  name: string;
-  description?: string;
-  image?: string;
-  startDate: string;
-  endDate: string;
-  status: 'scheduled' | 'active' | 'ended';
-  itemCount: number;
-  createdAt: string;
-  updatedAt: string;
+	_id: string;
+	name: string;
+	description?: string;
+	releaseDate: string;
+	status: string;
+	createdAt: string;
+	updatedAt: string;
 }
 
 export interface Demand {
-  _id: string;
-  userId: string;
-  user?: User;
-  title: string;
-  description: string;
-  categoryId?: string;
-  category?: Category;
-  maxPrice?: number;
-  status: 'open' | 'fulfilled' | 'closed';
-  createdAt: string;
-  updatedAt: string;
+	_id: string;
+	demand_name: string;
+	demand_rate: number;
 }
 
 export interface DiscountCode {
-  _id: string;
-  code: string;
-  type: 'percentage' | 'fixed';
-  value: number;
-  minPurchase?: number;
-  maxUses?: number;
-  usedCount: number;
-  startDate: string;
-  endDate: string;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+	_id: string;
+	code: string;
+	discount_percentage: number;
+	expiry_date: string;
+	is_active: boolean;
+	createdAt: string;
+	updatedAt: string;
 }
 
 export interface Review {
-  _id: string;
-  userId: string;
-  user?: User;
-  itemId?: string;
-  item?: Item;
-  sellerId?: string;
-  seller?: Seller;
-  orderId: string;
-  rating: number;
-  title?: string;
-  comment: string;
-  images?: string[];
-  status: 'pending' | 'approved' | 'rejected';
-  createdAt: string;
-  updatedAt: string;
+	_id: string;
+	userId: string;
+	sellerId: string;
+	rating: number;
+	description: string;
 }
 
 export interface Order {
-  _id: string;
-  userId: string;
-  user?: User;
-  orderNumber: string;
-  status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
-  subtotal: number;
-  discount: number;
-  shipping: number;
-  tax: number;
-  total: number;
-  shippingAddress: Address;
-  billingAddress: Address;
-  discountCodeId?: string;
-  discountCode?: DiscountCode;
-  notes?: string;
-  createdAt: string;
-  updatedAt: string;
+	_id: string;
+	user_id: string;
+	orderitem_ids: string[];
+	order_status: string;
+	deliveryDate?: string;
+	deliveryStatus?: string;
+	trackingReference?: string;
+	createdAt: string;
+	updatedAt: string;
 }
 
 export interface OrderItem {
-  _id: string;
-  orderId: string;
-  order?: Order;
-  itemId: string;
-  item?: Item;
-  quantity: number;
-  price: number;
-  total: number;
-  status: 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'returned';
-  createdAt: string;
-  updatedAt: string;
+	_id: string;
+	order_id: string;
+	item_id: string;
+	quantity: number;
+	price: number;
+	is_returned: boolean;
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface Income {
+	_id: string;
+	order_id?: string;
+	order_item_id?: string;
+	item_id?: string;
+	seller_id?: string;
+	amount: string;
+	erlumeCommissionAmount?: string;
+	sellerPayoutAmount?: string;
+	currency: string;
+	platform: string;
+	income_type: string;
+	received_at: string;
+	notes?: string;
+	createdAt?: string;
+	updatedAt?: string;
 }
 
 export interface Transaction {
-  _id: string;
-  orderId: string;
-  order?: Order;
-  userId: string;
-  user?: User;
-  type: 'payment' | 'refund' | 'payout';
-  amount: number;
-  currency: string;
-  status: 'pending' | 'completed' | 'failed' | 'cancelled';
-  provider: 'stripe' | 'paypal' | 'bank_transfer';
-  providerTransactionId?: string;
-  metadata?: Record<string, unknown>;
-  createdAt: string;
-  updatedAt: string;
+	_id: string;
+	order_id: string;
+	discount_rate: string;
+	amount: string;
+	discount_id?: string;
+	status: string;
+	paymentMethod?: string;
+	createdAt?: string;
+	updatedAt?: string;
+}
+
+export interface Sale {
+	_id: string;
+	order_id: string;
+	order_item_id: string;
+	transaction_id?: string;
+	invoice_number: string;
+	invoice_url: string;
+	payment_evidence_url: string;
+	createdAt?: string;
+	updatedAt?: string;
+}
+
+export interface Expense {
+	_id: string;
+	name: string;
+	cost: string;
+	currency?: string;
+	employee_id?: string;
+	notes?: string;
+	type?: string[];
+	month: string;
+	paidBy?: string;
+	isRecurring?: boolean;
+	phase?: string;
+	createdAt?: string;
+	updatedAt?: string;
 }
 
 export interface CreditCard {
-  _id: string;
-  userId: string;
-  user?: User;
-  last4: string;
-  brand: string;
-  expiryMonth: number;
-  expiryYear: number;
-  isDefault: boolean;
-  createdAt: string;
-  updatedAt: string;
+	_id: string;
+	cardNumber: string;
+	expiryDate: string;
+	holderName: string;
 }
 
 export interface Outfit {
-  _id: string;
-  userId: string;
-  user?: User;
-  name: string;
-  description?: string;
-  image?: string;
-  likes: number;
-  isPublic: boolean;
-  createdAt: string;
-  updatedAt: string;
+	_id: string;
+	item_ids: string[];
+	outfit_title: string;
+	outfit_tags: string[];
 }
 
 export interface OutfitItem {
-  _id: string;
-  outfitId: string;
-  outfit?: Outfit;
-  itemId: string;
-  item?: Item;
-  position?: { x: number; y: number };
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface Address {
-  street: string;
-  city: string;
-  state: string;
-  postalCode: string;
-  country: string;
+	_id: string;
+	item_id: string;
+	outfit_id: string;
+	featured_in_product: boolean;
 }
 
 // Dashboard KPI types
 export interface DashboardKpis {
-  totalRevenue: number;
-  revenueChange: number;
-  totalOrders: number;
-  ordersChange: number;
-  totalUsers: number;
-  usersChange: number;
-  totalItems: number;
-  itemsChange: number;
-  averageOrderValue: number;
-  conversionRate: number;
-  topCategories: { name: string; count: number; revenue: number }[];
-  revenueByDay: { date: string; revenue: number; orders: number }[];
-  ordersByStatus: { status: string; count: number }[];
+	totalRevenue: number;
+	revenueChange: number;
+	totalOrders: number;
+	ordersChange: number;
+	totalUsers: number;
+	usersChange: number;
+	totalItems: number;
+	itemsChange: number;
+	averageOrderValue: number;
+	conversionRate: number;
+	topCategories: { name: string; count: number; revenue: number }[];
+	revenueByDay: { date: string; revenue: number; orders: number }[];
+	ordersByStatus: { status: string; count: number }[];
 }
 
 // Pagination types
 export interface PaginatedResponse<T> {
-  data: T[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
+	data: T[];
+	total: number;
+	page: number;
+	limit: number;
+	totalPages: number;
 }
 
 export interface TableFilters {
-  search?: string;
-  status?: string;
-  categoryId?: string;
-  sellerId?: string;
-  dropId?: string;
-  startDate?: string;
-  endDate?: string;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
+	search?: string;
+	status?: string;
+	categoryId?: string;
+	sellerId?: string;
+	dropId?: string;
+	startDate?: string;
+	endDate?: string;
+	sortBy?: string;
+	sortOrder?: "asc" | "desc";
 }
