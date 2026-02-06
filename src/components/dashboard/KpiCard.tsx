@@ -16,7 +16,7 @@ export function KpiCard({ title, value, change, icon, trend, format = 'number' }
     if (typeof val === 'string') return val;
     switch (format) {
       case 'currency':
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
+        return `KD ${new Intl.NumberFormat('en-US').format(val)}`;
       case 'percentage':
         return `${val.toFixed(1)}%`;
       default:

@@ -71,6 +71,7 @@ export interface Item {
 	year?: string;
 	quantity: string;
 	brandName: string;
+	bagBrand?: string;
 	imageUrls: string[];
 	receiptPhotoUrls?: string[];
 	priceEstimatorUrls?: string[];

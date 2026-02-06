@@ -221,7 +221,7 @@ export default function SellersPage() {
 			header: "Balance",
 			render: (seller) => (
 				<span className="font-medium">
-					${Number(seller.balance || 0).toFixed(2)}
+					KD {Number(seller.balance || 0).toFixed(2)}
 				</span>
 			),
 		},
@@ -534,7 +534,7 @@ export default function SellersPage() {
 									<span className="text-sm text-muted-foreground">Balance</span>
 								</div>
 								<p className="text-lg font-semibold">
-									${Number(selectedSeller.balance || 0).toFixed(2)}
+									KD {Number(selectedSeller.balance || 0).toFixed(2)}
 								</p>
 							</div>
 							<div className="p-3 bg-muted/30 rounded-lg">

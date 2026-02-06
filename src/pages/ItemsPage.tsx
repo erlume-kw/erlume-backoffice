@@ -56,6 +56,8 @@ export default function ItemsPage() {
 	const [formReturnDate, setFormReturnDate] = useState<Date | undefined>(
 		undefined,
 	);
+	const [formBagBrand, setFormBagBrand] = useState("");
+	const [bagBrandSearch, setBagBrandSearch] = useState("");
 	const [formError, setFormError] = useState<string | null>(null);
 	const loadItems = useCallback(
 		() => restApi.items.getAll() as Promise<Item[]>,
@@ -89,6 +91,10 @@ export default function ItemsPage() {
 		() => restApi.enums.getByCategory("itemCondition"),
 		[],
 	);
+	const loadBagBrand = useCallback(
+		() => restApi.enums.getByCategory("bagBrand"),
+		[],
+	);
 	const { data: items, loading, error, reload } = useResourceList(loadItems);
 	const { data: drops } = useResourceList<Drop>(loadDrops);
 	const { data: categories } = useResourceList(loadCategories);
@@ -97,6 +103,7 @@ export default function ItemsPage() {
 	const { data: users } = useResourceList(loadUsers);
 	const { data: itemStatus } = useResourceList(loadItemStatus);
 	const { data: itemCondition } = useResourceList(loadItemCondition);
+	const { data: bagBrand, error: bagBrandError, loading: bagBrandLoading } = useResourceList(loadBagBrand);
 	const userLabelById = useMemo(
 		() =>
 			new Map(
@@ -167,7 +174,7 @@ export default function ItemsPage() {
 			render: (item) => (
 				<div>
 					<p className="font-medium text-foreground">
-						$
+						KD{" "}
 						{typeof item.basePrice === "string"
 							? Number(item.basePrice).toLocaleString()
 							: String(item.basePrice)}
@@ -261,6 +268,28 @@ export default function ItemsPage() {
 		"itemCondition",
 		itemConditionValues,
 	);
+	const bagBrandArray = Array.isArray(bagBrand) ? bagBrand : [];
+	console.log("bagBrand data:", bagBrand, "bagBrandArray:", bagBrandArray);
+	const bagBrandOptions = useMemo(() => {
+		const options = bagBrandArray.map((value) => ({
+			value: String(value),
+			label: String(value)
+				.replace(/_/g, " ")
+				.replace(/\b\w/g, (letter) => letter.toUpperCase()),
+		}));
+		console.log("bagBrandOptions:", options);
+		return options;
+	}, [bagBrandArray]);
+	const filteredBagBrands = useMemo(() => {
+		if (!bagBrandSearch) {
+			return bagBrandOptions;
+		}
+		const query = bagBrandSearch.toLowerCase();
+		return bagBrandOptions.filter((option) =>
+			option.label.toLowerCase().includes(query) ||
+			option.value.toLowerCase().includes(query),
+		);
+	}, [bagBrandOptions, bagBrandSearch]);
 	const activeSellers = useMemo(
 		() => sellers.filter((seller) => !seller.isDeactivated),
 		[sellers],
@@ -290,7 +319,7 @@ export default function ItemsPage() {
 		return subcategories.filter((sub) => sub.category_id === formCategoryId);
 	}, [formCategoryId, subcategories]);
 	const activeDrops = useMemo(
-		() => drops.filter((drop) => drop.status === "active"),
+		() => drops.filter((drop) => drop.status === "active" || drop.status === "upcoming"),
 		[drops],
 	);
 
@@ -335,6 +364,7 @@ export default function ItemsPage() {
 		const payload: Record<string, unknown> = {
 			itemName: String(formData.get("itemName") || "").trim(),
 			brandName: String(formData.get("brandName") || "").trim(),
+			bagBrand: formBagBrand || undefined,
 			condition: formCondition,
 			basePrice,
 			saleRate,
@@ -416,6 +446,8 @@ export default function ItemsPage() {
 			setEditingItem(null);
 			setFormAuthenticatedAt(undefined);
 			setFormReturnDate(undefined);
+			setFormBagBrand("");
+			setBagBrandSearch("");
 			setFormError(null);
 		} catch (err) {
 			const message =
@@ -446,6 +478,8 @@ export default function ItemsPage() {
 					setSellerSearch("");
 					setFormCategoryId("");
 					setFormSubCategoryId(undefined);
+					setFormBagBrand("");
+					setBagBrandSearch("");
 					setShowForm(true);
 				}}
 				addLabel="Add Item"
@@ -524,6 +558,8 @@ export default function ItemsPage() {
 						);
 						setFormStep(1);
 						setFormCondition(item.condition);
+						setFormBagBrand((item as Item & { bagBrand?: string }).bagBrand || "");
+						setBagBrandSearch("");
 						setFormStatus(item.itemStatus);
 						setFormDropId(item.drop_id);
 						setFormSellerId(getSellerId(item));
@@ -572,7 +608,7 @@ export default function ItemsPage() {
 							<div className="p-3 bg-muted/30 rounded-lg">
 								<p className="text-sm text-muted-foreground">Base Price</p>
 								<p className="text-lg font-semibold">
-									$
+									KD{" "}
 									{typeof selectedItem.basePrice === "string"
 										? Number(selectedItem.basePrice).toLocaleString()
 										: String(selectedItem.basePrice)}
@@ -812,6 +848,8 @@ export default function ItemsPage() {
 										? new Date(selectedItem.returnDate)
 										: undefined,
 								);
+								setFormBagBrand((selectedItem as Item & { bagBrand?: string }).bagBrand || "");
+								setBagBrandSearch("");
 								setFormError(null);
 								setFormStep(1);
 								setFormCondition(selectedItem.condition);
@@ -843,6 +881,8 @@ export default function ItemsPage() {
 					setSellerSearch("");
 					setFormCategoryId("");
 					setFormSubCategoryId(undefined);
+					setFormBagBrand("");
+					setBagBrandSearch("");
 					setFormStep(1);
 				}}
 				title={editingItem ? "Edit Item" : "Add Item"}
@@ -933,6 +973,53 @@ export default function ItemsPage() {
 										defaultValue={editingItem?.brandName}
 										placeholder="BrandX"
 									/>
+								</div>
+								<div className="space-y-2">
+									<Label>Bag Brand</Label>
+									{bagBrandError && (
+										<p className="text-xs text-destructive">
+											Failed to load bag brands: {String(bagBrandError)}
+										</p>
+									)}
+									{bagBrandLoading && (
+										<p className="text-xs text-muted-foreground">
+											Loading bag brands...
+										</p>
+									)}
+									<Input
+										value={bagBrandSearch}
+										onChange={(event) => setBagBrandSearch(event.target.value)}
+										placeholder="Search bag brands..."
+										disabled={bagBrandLoading}
+									/>
+									<Select
+										value={formBagBrand || "none"}
+										onValueChange={(value) =>
+											setFormBagBrand(value === "none" ? "" : value)
+										}
+										disabled={bagBrandLoading}>
+										<SelectTrigger>
+											<SelectValue placeholder="Select bag brand" />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="none">No bag brand</SelectItem>
+											{bagBrandLoading && (
+												<SelectItem value="__loading__" disabled>
+													Loading...
+												</SelectItem>
+											)}
+											{!bagBrandLoading && filteredBagBrands.length === 0 && (
+												<SelectItem value="__none__" disabled>
+													{bagBrandError ? "Error loading bag brands" : "No bag brands found"}
+												</SelectItem>
+											)}
+											{filteredBagBrands.map((option) => (
+												<SelectItem key={option.value} value={option.value}>
+													{option.label}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
 								</div>
 								<div className="grid grid-cols-2 gap-4">
 									<div className="space-y-2">
@@ -1401,6 +1488,8 @@ export default function ItemsPage() {
 									setSellerSearch("");
 									setFormCategoryId("");
 									setFormSubCategoryId(undefined);
+									setFormBagBrand("");
+									setBagBrandSearch("");
 									setFormStep(1);
 								}}>
 								Cancel

@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, Column } from "@/components/common/DataTable";
@@ -6,7 +6,14 @@ import { DetailPanel } from "@/components/common/DetailPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { SubCategory } from "@/types/models";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+import type { Category, Demand, SubCategory } from "@/types/models";
 import { FolderTree } from "lucide-react";
 import { restApi } from "@/lib/rest-client";
 import { useResourceList } from "@/hooks/use-resource-list";
@@ -18,16 +25,46 @@ export default function SubCategoriesPage() {
 	const [showForm, setShowForm] = useState(false);
 	const [editingSubCategory, setEditingSubCategory] =
 		useState<SubCategory | null>(null);
+	const [formCategoryId, setFormCategoryId] = useState("");
+	const [formDemandId, setFormDemandId] = useState("");
+	const [formError, setFormError] = useState<string | null>(null);
+
 	const loadSubCategories = useCallback(
 		() => restApi.subcategories.getAll(),
 		[],
 	);
+	const loadCategories = useCallback(
+		() => restApi.categories.getAll() as Promise<Category[]>,
+		[],
+	);
+	const loadDemands = useCallback(
+		() => restApi.demands.getAll() as Promise<Demand[]>,
+		[],
+	);
+
 	const {
 		data: subcategories,
 		loading,
 		error,
 		reload,
 	} = useResourceList(loadSubCategories);
+	const { data: categories } = useResourceList(loadCategories);
+	const { data: demands } = useResourceList(loadDemands);
+
+	const categoryNameById = useMemo(
+		() => new Map(categories.map((cat) => [cat._id, cat.name])),
+		[categories],
+	);
+	const demandLabelById = useMemo(
+		() =>
+			new Map(
+				demands.map((demand) => [
+					demand._id,
+					`${demand._id.slice(-6)} · ${demand.demand_rate ?? ""}`,
+				]),
+			),
+		[demands],
+	);
 
 	const columns: Column<SubCategory>[] = [
 		{
@@ -41,7 +78,7 @@ export default function SubCategoriesPage() {
 					<div>
 						<p className="font-medium text-foreground">{sub.sub_cat_name}</p>
 						<p className="text-sm text-muted-foreground truncate max-w-[200px]">
-							{sub.category_id}
+							{categoryNameById.get(sub.category_id) || sub.category_id}
 						</p>
 					</div>
 				</div>
@@ -51,14 +88,20 @@ export default function SubCategoriesPage() {
 			key: "category_id",
 			header: "Category",
 			render: (sub) => (
-				<span className="text-muted-foreground">{sub.category_id}</span>
+				<span className="text-muted-foreground">
+					{categoryNameById.get(sub.category_id) || sub.category_id}
+				</span>
 			),
 		},
 		{
 			key: "demand_id",
 			header: "Demand",
 			render: (sub) => (
-				<span className="text-muted-foreground">{sub.demand_id || "—"}</span>
+				<span className="text-muted-foreground">
+					{sub.demand_id
+						? demandLabelById.get(sub.demand_id) || sub.demand_id
+						: "—"}
+				</span>
 			),
 		},
 		{
@@ -93,12 +136,25 @@ export default function SubCategoriesPage() {
 
 	const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
+		setFormError(null);
 		const formData = new FormData(event.currentTarget);
+		const sub_cat_name = String(formData.get("sub_cat_name") || "").trim();
+		const sub_clean_rate = Number(formData.get("sub_clean_rate") || 0);
+
+		if (!sub_cat_name) {
+			setFormError("Subcategory name is required.");
+			return;
+		}
+		if (!formCategoryId) {
+			setFormError("Category is required.");
+			return;
+		}
+
 		const payload = {
-			sub_cat_name: String(formData.get("sub_cat_name") || ""),
-			category_id: String(formData.get("category_id") || ""),
-			demand_id: String(formData.get("demand_id") || "") || undefined,
-			sub_clean_rate: Number(formData.get("sub_clean_rate") || 0),
+			sub_cat_name,
+			category_id: formCategoryId,
+			demand_id: formDemandId || undefined,
+			sub_clean_rate,
 		};
 
 		try {
@@ -110,7 +166,13 @@ export default function SubCategoriesPage() {
 			await reload();
 			setShowForm(false);
 			setEditingSubCategory(null);
+			setFormCategoryId("");
+			setFormDemandId("");
+			setFormError(null);
 		} catch (err) {
+			const message =
+				err instanceof Error ? err.message : "Failed to save subcategory";
+			setFormError(message);
 			console.error("Failed to save subcategory", err);
 		}
 	};
@@ -125,6 +187,9 @@ export default function SubCategoriesPage() {
 				searchPlaceholder="Search subcategories..."
 				onAdd={() => {
 					setEditingSubCategory(null);
+					setFormCategoryId("");
+					setFormDemandId("");
+					setFormError(null);
 					setShowForm(true);
 				}}
 				addLabel="Create Subcategory"
@@ -144,6 +209,9 @@ export default function SubCategoriesPage() {
 					onView={(sub) => setSelectedSubCategory(sub)}
 					onEdit={(sub) => {
 						setEditingSubCategory(sub);
+						setFormCategoryId(sub.category_id);
+						setFormDemandId(sub.demand_id || "");
+						setFormError(null);
 						setShowForm(true);
 					}}
 					onDelete={(sub) => void handleDelete(sub._id)}
@@ -159,19 +227,23 @@ export default function SubCategoriesPage() {
 					<div className="space-y-4">
 						<div className="flex justify-between">
 							<span className="text-muted-foreground">Category</span>
-							<span className="font-mono text-sm">
-								{selectedSubCategory.category_id}
+							<span className="text-sm font-medium">
+								{categoryNameById.get(selectedSubCategory.category_id) ||
+									selectedSubCategory.category_id}
 							</span>
 						</div>
 						<div className="flex justify-between">
 							<span className="text-muted-foreground">Demand</span>
-							<span className="font-mono text-sm">
-								{selectedSubCategory.demand_id || "—"}
+							<span className="text-sm font-medium">
+								{selectedSubCategory.demand_id
+									? demandLabelById.get(selectedSubCategory.demand_id) ||
+									  selectedSubCategory.demand_id
+									: "—"}
 							</span>
 						</div>
 						<div className="flex justify-between">
 							<span className="text-muted-foreground">Clean Rate</span>
-							<span className="font-mono text-sm">
+							<span className="text-sm font-medium">
 								{selectedSubCategory.sub_clean_rate}
 							</span>
 						</div>
@@ -180,6 +252,9 @@ export default function SubCategoriesPage() {
 							className="w-full"
 							onClick={() => {
 								setEditingSubCategory(selectedSubCategory);
+								setFormCategoryId(selectedSubCategory.category_id);
+								setFormDemandId(selectedSubCategory.demand_id || "");
+								setFormError(null);
 								setShowForm(true);
 								setSelectedSubCategory(null);
 							}}>
@@ -194,37 +269,80 @@ export default function SubCategoriesPage() {
 				onClose={() => {
 					setShowForm(false);
 					setEditingSubCategory(null);
+					setFormCategoryId("");
+					setFormDemandId("");
+					setFormError(null);
 				}}
 				title={editingSubCategory ? "Edit Subcategory" : "Create Subcategory"}
 				type="dialog"
 				size="md">
 				<form className="space-y-4" onSubmit={handleSubmit}>
+					{formError && (
+						<div className="text-sm text-destructive">{formError}</div>
+					)}
 					<div className="space-y-2">
-						<Label htmlFor="sub_cat_name">Subcategory Name</Label>
+						<Label htmlFor="sub_cat_name">Subcategory Name *</Label>
 						<Input
 							id="sub_cat_name"
 							name="sub_cat_name"
 							defaultValue={editingSubCategory?.sub_cat_name}
 							placeholder="Handbags"
+							required
 						/>
 					</div>
 					<div className="space-y-2">
-						<Label htmlFor="category_id">Category ID</Label>
-						<Input
-							id="category_id"
-							name="category_id"
-							defaultValue={editingSubCategory?.category_id}
-							placeholder="Category ID"
-						/>
+						<Label>Category *</Label>
+						<Select
+							value={formCategoryId || "__placeholder__"}
+							onValueChange={(value) =>
+								setFormCategoryId(
+									value === "__placeholder__" ? "" : value,
+								)
+							}>
+							<SelectTrigger>
+								<SelectValue placeholder="Select category" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="__placeholder__">
+									Select category
+								</SelectItem>
+								{categories.length === 0 && (
+									<SelectItem value="__none__" disabled>
+										No categories found
+									</SelectItem>
+								)}
+								{categories.map((cat) => (
+									<SelectItem key={cat._id} value={cat._id}>
+										{categoryNameById.get(cat._id) ?? cat.name}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
 					</div>
 					<div className="space-y-2">
-						<Label htmlFor="demand_id">Demand ID</Label>
-						<Input
-							id="demand_id"
-							name="demand_id"
-							defaultValue={editingSubCategory?.demand_id}
-							placeholder="Optional"
-						/>
+						<Label>Demand (Optional)</Label>
+						<Select
+							value={formDemandId || "none"}
+							onValueChange={(value) =>
+								setFormDemandId(value === "none" ? "" : value)
+							}>
+							<SelectTrigger>
+								<SelectValue placeholder="Select demand" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="none">No demand</SelectItem>
+								{demands.length === 0 && (
+									<SelectItem value="__none__" disabled>
+										No demands found
+									</SelectItem>
+								)}
+								{demands.map((demand) => (
+									<SelectItem key={demand._id} value={demand._id}>
+										{demandLabelById.get(demand._id) ?? demand._id}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
 					</div>
 					<div className="space-y-2">
 						<Label htmlFor="sub_clean_rate">Sub Clean Rate</Label>
@@ -244,6 +362,9 @@ export default function SubCategoriesPage() {
 							onClick={() => {
 								setShowForm(false);
 								setEditingSubCategory(null);
+								setFormCategoryId("");
+								setFormDemandId("");
+								setFormError(null);
 							}}>
 							Cancel
 						</Button>

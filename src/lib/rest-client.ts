@@ -134,19 +134,33 @@ export const restApi = {
 				endpoints.enums,
 			),
 		getByCategory: async (category: string) => {
-			const result = await apiRequest<
-				Array<string | number> | { values?: Array<string | number> }
-			>(`${endpoints.enums}/${category}`);
-			if (Array.isArray(result)) {
-				return result.map((value) => String(value));
-			}
-			if (result && typeof result === "object") {
-				const values = result.values;
-				if (Array.isArray(values)) {
-					return values.map((value) => String(value));
+			try {
+				const url = `${endpoints.enums}/${category}`;
+				console.log(`Fetching enum category from: ${url}`);
+				const result = await apiRequest<
+					Array<string | number> | { values?: Array<string | number> }
+				>(url);
+				console.log(`Enum category "${category}" response:`, result);
+				if (Array.isArray(result)) {
+					const mapped = result.map((value) => String(value));
+					console.log(`Enum category "${category}" mapped to array:`, mapped);
+					return mapped;
 				}
+				if (result && typeof result === "object") {
+					const values = result.values;
+					if (Array.isArray(values)) {
+						const mapped = values.map((value) => String(value));
+						console.log(`Enum category "${category}" mapped from object:`, mapped);
+						return mapped;
+					}
+				}
+				console.warn(`Enum category "${category}" returned unexpected format:`, result);
+				return [];
+			} catch (error) {
+				console.error(`Failed to fetch enum category "${category}":`, error);
+				// Return empty array instead of throwing to prevent breaking the UI
+				return [];
 			}
-			return [];
 		},
 	},
 	usersExtra: {

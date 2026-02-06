@@ -343,7 +343,7 @@ export default function DashboardPage() {
 						change={dashboardKpis.revenueChange}
 						trend="up"
 						format="currency"
-						icon={<DollarSign className="h-5 w-5" />}
+						icon={<span className="text-lg font-semibold text-primary">KD</span>}
 					/>
 					<KpiCard
 						title="Total Orders"
@@ -419,7 +419,7 @@ export default function DashboardPage() {
 								<YAxis
 									stroke="hsl(var(--muted-foreground))"
 									fontSize={12}
-									tickFormatter={(v) => `$${v / 1000}k`}
+									tickFormatter={(v) => `KD ${v / 1000}k`}
 								/>
 								<Tooltip
 									contentStyle={{
@@ -429,7 +429,7 @@ export default function DashboardPage() {
 									}}
 									labelStyle={{ color: "hsl(var(--foreground))" }}
 									formatter={(value: number) => [
-										`$${value.toLocaleString()}`,
+										`KD ${value.toLocaleString()}`,
 										"Revenue",
 									]}
 								/>
@@ -559,7 +559,7 @@ export default function DashboardPage() {
 									</div>
 									<div className="text-right">
 										<p className="font-medium text-foreground">
-											${order.total.toFixed(2)}
+											KD {order.total.toFixed(2)}
 										</p>
 										<StatusBadge status={order.status} />
 									</div>
@@ -599,7 +599,7 @@ export default function DashboardPage() {
 										{seller.sales} sales
 									</p>
 									<p className="text-lg font-semibold text-foreground">
-										${seller.revenue.toLocaleString()}
+										KD {seller.revenue.toLocaleString()}
 									</p>
 								</div>
 							</div>

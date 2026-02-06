@@ -93,7 +93,7 @@ export default function SalesPage() {
 			new Map(
 				safeTransactions.map((t) => [
 					t._id,
-					`${t._id.slice(-6)} · $${Number(t.amount ?? 0).toFixed(2)}`,
+					`${t._id.slice(-6)} · KD ${Number(t.amount ?? 0).toFixed(2)}`,
 				]),
 			),
 		[safeTransactions],

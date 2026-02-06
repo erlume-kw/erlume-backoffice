@@ -121,7 +121,7 @@ export default function IncomesPage() {
 			header: "Amount",
 			render: (inc) => (
 				<span className="font-semibold text-foreground">
-					${Number(inc.amount ?? 0).toFixed(2)}
+					KD {Number(inc.amount ?? 0).toFixed(2)}
 				</span>
 			),
 		},
@@ -130,7 +130,7 @@ export default function IncomesPage() {
 			header: "Erlume commission",
 			render: (inc) => (
 				<span className="text-muted-foreground">
-					${Number(inc.erlumeCommissionAmount ?? 0).toFixed(2)}
+					KD {Number(inc.erlumeCommissionAmount ?? 0).toFixed(2)}
 				</span>
 			),
 		},
@@ -139,7 +139,7 @@ export default function IncomesPage() {
 			header: "Seller payout",
 			render: (inc) => (
 				<span className="text-muted-foreground">
-					${Number(inc.sellerPayoutAmount ?? 0).toFixed(2)}
+					KD {Number(inc.sellerPayoutAmount ?? 0).toFixed(2)}
 				</span>
 			),
 		},
@@ -381,7 +381,7 @@ export default function IncomesPage() {
 							</div>
 							<div>
 								<p className="text-lg font-semibold">
-									${Number(selectedIncome.amount ?? 0).toFixed(2)}
+									KD {Number(selectedIncome.amount ?? 0).toFixed(2)}
 								</p>
 								<p className="text-sm text-muted-foreground">
 									Commission breakdown
@@ -394,8 +394,7 @@ export default function IncomesPage() {
 									Erlume commission
 								</p>
 								<p className="font-medium">
-									$
-									{Number(selectedIncome.erlumeCommissionAmount ?? 0).toFixed(
+									KD {Number(selectedIncome.erlumeCommissionAmount ?? 0).toFixed(
 										2,
 									)}
 								</p>
@@ -403,7 +402,7 @@ export default function IncomesPage() {
 							<div className="p-3 bg-muted/30 rounded-lg">
 								<p className="text-xs text-muted-foreground">Seller payout</p>
 								<p className="font-medium">
-									${Number(selectedIncome.sellerPayoutAmount ?? 0).toFixed(2)}
+									KD {Number(selectedIncome.sellerPayoutAmount ?? 0).toFixed(2)}
 								</p>
 							</div>
 							<div className="p-3 bg-muted/30 rounded-lg col-span-2">

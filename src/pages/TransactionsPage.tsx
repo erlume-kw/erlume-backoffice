@@ -123,7 +123,7 @@ export default function TransactionsPage() {
 			header: "Amount",
 			render: (tx) => (
 				<span className="font-semibold text-success">
-					${Number(tx.amount ?? 0).toFixed(2)}
+					KD {Number(tx.amount ?? 0).toFixed(2)}
 				</span>
 			),
 		},
