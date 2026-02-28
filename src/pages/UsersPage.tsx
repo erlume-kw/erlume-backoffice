@@ -19,16 +19,19 @@ import {
 import type { User } from "@/types/models";
 import { Mail, Phone, Calendar, User as UserIcon } from "lucide-react";
 import { restApi } from "@/lib/rest-client";
-import {
-	getEnumOptions,
-	getEnumValues,
-	kuwaitGovernorateCities,
-} from "@/lib/enums";
+import { getEnumOptions, getEnumValues } from "@/lib/enums";
 import { useResourceList } from "@/hooks/use-resource-list";
 
 const formatPhoneNumber = (value: string) => value.trim();
 
 export default function UsersPage() {
+	const usersApi = restApi.users as unknown as {
+		getAll: (
+			params?: Record<string, string | number | boolean | undefined>,
+		) => Promise<User[]>;
+		create: (data: Record<string, unknown>) => Promise<User>;
+		update: (id: string, data: Record<string, unknown>) => Promise<User>;
+	};
 	const [search, setSearch] = useState("");
 	const [filters, setFilters] = useState<Record<string, string | undefined>>({
 		status: "active",
@@ -42,7 +45,7 @@ export default function UsersPage() {
 	const [formStatus, setFormStatus] = useState("active");
 	const [formGovernorate, setFormGovernorate] = useState("");
 	const [formCity, setFormCity] = useState("");
-	const loadUsers = useCallback(() => restApi.users.getAll(), []);
+	const loadUsers = useCallback(() => usersApi.getAll(), [usersApi]);
 	const loadUserRoles = useCallback(
 		() => restApi.enums.getByCategory("userRole"),
 		[],
@@ -76,16 +79,6 @@ export default function UsersPage() {
 	);
 	const cityValues = getEnumValues("kuwaitCity", cities);
 	const cityOptions = getEnumOptions("kuwaitCity", cityValues);
-	const filteredCityOptions = useMemo(() => {
-		if (!formGovernorate) {
-			return cityOptions;
-		}
-		const entry =
-			kuwaitGovernorateCities[
-				formGovernorate as keyof typeof kuwaitGovernorateCities
-			];
-		return entry?.cities ? [...entry.cities] : cityOptions;
-	}, [cityOptions, formGovernorate]);
 
 	useEffect(() => {
 		if (!showForm || editingUser) {
@@ -96,8 +89,8 @@ export default function UsersPage() {
 			setFormGovernorate(governorateValues[0]);
 		}
 
-		if (!formCity && filteredCityOptions.length > 0) {
-			setFormCity(filteredCityOptions[0].value);
+		if (!formCity && cityOptions.length > 0) {
+			setFormCity(cityOptions[0].value);
 		}
 	}, [
 		showForm,
@@ -105,7 +98,7 @@ export default function UsersPage() {
 		formGovernorate,
 		formCity,
 		governorateValues,
-		filteredCityOptions,
+		cityOptions,
 	]);
 
 	useEffect(() => {
@@ -113,20 +106,18 @@ export default function UsersPage() {
 			return;
 		}
 
-		if (filteredCityOptions.length === 0) {
+		if (cityOptions.length === 0) {
 			if (formCity) {
 				setFormCity("");
 			}
 			return;
 		}
 
-		const cityIsValid = filteredCityOptions.some(
-			(option) => option.value === formCity,
-		);
+		const cityIsValid = cityOptions.some((option) => option.value === formCity);
 		if (!cityIsValid) {
-			setFormCity(filteredCityOptions[0].value);
+			setFormCity(cityOptions[0].value);
 		}
-	}, [showForm, formGovernorate, filteredCityOptions, formCity]);
+	}, [showForm, cityOptions, formCity]);
 
 	const columns: Column<User>[] = [
 		{
@@ -263,9 +254,9 @@ export default function UsersPage() {
 				return;
 			}
 			if (editingUser) {
-				await restApi.users.update(editingUser._id, payload);
+				await usersApi.update(editingUser._id, payload as Record<string, unknown>);
 			} else {
-				await restApi.users.create(payload);
+				await usersApi.create(payload as Record<string, unknown>);
 			}
 			await reload();
 			setShowForm(false);
@@ -559,12 +550,12 @@ export default function UsersPage() {
 											Failed to load cities
 										</SelectItem>
 									)}
-									{filteredCityOptions.length === 0 && (
+									{cityOptions.length === 0 && (
 										<SelectItem value="__none__" disabled>
 											No cities found
 										</SelectItem>
 									)}
-									{filteredCityOptions.map(({ value, label }) => (
+									{cityOptions.map(({ value, label }) => (
 										<SelectItem key={value} value={value}>
 											{label}
 										</SelectItem>

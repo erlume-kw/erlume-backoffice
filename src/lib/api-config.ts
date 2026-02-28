@@ -7,10 +7,13 @@ export const GRAPHQL_ENDPOINT =
 function getOpenApiSpecUrl(): string {
 	const explicit = import.meta.env.VITE_OPENAPI_SPEC_URL;
 	if (explicit && typeof explicit === "string") return explicit;
-	const base = typeof API_BASE_URL === "string" && /^https?:\/\//.test(API_BASE_URL)
-		? API_BASE_URL.replace(/\/api\/?$/, "")
-		: "";
-	return base ? `${base}/api-docs/backoffice.json` : "/api-docs/backoffice.json";
+	const base =
+		typeof API_BASE_URL === "string" && /^https?:\/\//.test(API_BASE_URL)
+			? API_BASE_URL.replace(/\/api\/?$/, "")
+			: "";
+	return base
+		? `${base}/api-docs/backoffice.json`
+		: "/api-docs/backoffice.json";
 }
 export const OPENAPI_SPEC_URL = getOpenApiSpecUrl();
 
@@ -34,5 +37,6 @@ export const endpoints = {
 	incomes: `${API_BASE_URL}/incomes`,
 	expenses: `${API_BASE_URL}/expenses`,
 	sales: `${API_BASE_URL}/sales`,
+	/** GET /api/enums, GET /api/enums/{category} — OpenAPI Enums (orderStatus, itemStatus, bagBrand, kuwaitGovernorate, kuwaitCity, etc.) */
 	enums: `${API_BASE_URL}/enums`,
 } as const;

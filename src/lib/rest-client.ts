@@ -97,7 +97,15 @@ export const restApi = {
 				method: "DELETE",
 			}),
 	},
-	items: createCrudApi(endpoints.items),
+	items: {
+		...createCrudApi(endpoints.items),
+		/** PATCH item (partial update). Use to set only seller_id when syncing from Sellers page. */
+		patch: (id: string, data: Record<string, unknown>) =>
+			apiRequest(`${endpoints.items}/${id}`, {
+				method: "PATCH",
+				body: JSON.stringify(data),
+			}),
+	},
 	categories: createCrudApi(endpoints.categories),
 	subcategories: createCrudApi(endpoints.subcategories),
 	orders: {
@@ -128,37 +136,67 @@ export const restApi = {
 		getByOrderId: (orderId: string) =>
 			apiRequest<Sale[]>(`${endpoints.sales}/order/${orderId}`),
 	},
+	/**
+	 * Enums API — OpenAPI paths: GET /api/enums, GET /api/enums/{category}.
+	 * Categories: orderStatus, itemStatus, authenticationStatus, returnStatus,
+	 * deliveryStatus, escalationStatus, bagBrand, kuwaitGovernorate, kuwaitCity, etc.
+	 */
 	enums: {
+		/** GET /api/enums — get all enums. */
 		getAll: () =>
-			apiRequest<Record<string, { values: Array<string | number> }>>(
+			apiRequest<Record<string, { values?: Array<string | number> }>>(
 				endpoints.enums,
 			),
-		getByCategory: async (category: string) => {
+		/** GET /api/enums/{category} — get enum values by category. Returns string[]. */
+		getByCategory: async (category: string): Promise<string[]> => {
 			try {
 				const url = `${endpoints.enums}/${category}`;
-				console.log(`Fetching enum category from: ${url}`);
-				const result = await apiRequest<
-					Array<string | number> | { values?: Array<string | number> }
-				>(url);
-				console.log(`Enum category "${category}" response:`, result);
+				const result = await apiRequest<unknown>(url);
 				if (Array.isArray(result)) {
-					const mapped = result.map((value) => String(value));
-					console.log(`Enum category "${category}" mapped to array:`, mapped);
-					return mapped;
+					return result.map((value) => String(value));
 				}
 				if (result && typeof result === "object") {
-					const values = result.values;
-					if (Array.isArray(values)) {
-						const mapped = values.map((value) => String(value));
-						console.log(`Enum category "${category}" mapped from object:`, mapped);
-						return mapped;
+					const obj = result as Record<string, unknown>;
+					if (Array.isArray(obj.values)) {
+						return obj.values.map((value) => String(value));
+					}
+					// Response may wrap array in { data: [...] } or { data: { values: [...] } }
+					for (const key of ["data", "items", "results"]) {
+						const val = obj[key];
+						if (Array.isArray(val)) {
+							return val.map((value) => String(value));
+						}
+						if (val && typeof val === "object") {
+							const inner = val as Record<string, unknown>;
+							if (Array.isArray(inner.values)) {
+								return inner.values.map((value) => String(value));
+							}
+							// Nested by category: { data: { bagBrand: ["Gucci", ...] } }
+							const byCategory = inner[category];
+							if (Array.isArray(byCategory)) {
+								return byCategory.map((value) => String(value));
+							}
+						}
+					}
+					// Only use object keys as enum values if they look like enum entries (not wrapper keys)
+					const skipKeys = new Set([
+						"success",
+						"category",
+						"message",
+						"error",
+						"data",
+						"items",
+						"results",
+						"values",
+					]);
+					const keys = Object.keys(obj).filter((k) => !skipKeys.has(k));
+					if (keys.length > 0) {
+						return keys.map((k) => String(k));
 					}
 				}
-				console.warn(`Enum category "${category}" returned unexpected format:`, result);
 				return [];
 			} catch (error) {
 				console.error(`Failed to fetch enum category "${category}":`, error);
-				// Return empty array instead of throwing to prevent breaking the UI
 				return [];
 			}
 		},

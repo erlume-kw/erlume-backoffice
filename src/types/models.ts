@@ -57,6 +57,7 @@ export interface SubCategory {
 	sub_clean_rate: number;
 }
 
+/** Item — canonical schema: itemName, brandName (only brand field; do not use brand), basePrice, condition, uploadedAt, saleRate, itemStatus, color, size, itemModel, year, quantity, listingPrice (required), category_id, etc. */
 export interface Item {
 	_id: string;
 	basePrice: string;
@@ -71,7 +72,6 @@ export interface Item {
 	year?: string;
 	quantity: string;
 	brandName: string;
-	bagBrand?: string;
 	imageUrls: string[];
 	receiptPhotoUrls?: string[];
 	priceEstimatorUrls?: string[];
@@ -81,7 +81,7 @@ export interface Item {
 	orderId?: string;
 	authNeeded?: boolean;
 	cleaningNeeded?: boolean;
-	listingPrice?: string;
+	listingPrice: string;
 	photographed?: boolean;
 	authenticationStatus?: string;
 	authenticatedAt?: string;

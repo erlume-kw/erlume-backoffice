@@ -143,6 +143,24 @@ export default function SellersPage() {
 			),
 		[items],
 	);
+	/** Item count per seller derived from items (item.seller_id / sellerId). More accurate than seller.itemIds when backend doesn't sync it. */
+	const itemCountBySellerId = useMemo(() => {
+		const countBy = new Map<string, number>();
+		for (const item of items) {
+			const sid =
+				(item as Item & { sellerId?: string }).sellerId ?? item.seller_id ?? "";
+			if (!sid) continue;
+			countBy.set(sid, (countBy.get(sid) ?? 0) + 1);
+		}
+		return countBy;
+	}, [items]);
+	const getItemCountForSeller = (seller: Seller): number => {
+		const bySellerId = itemCountBySellerId.get(seller._id);
+		if (bySellerId !== undefined) return bySellerId;
+		const byUserId = itemCountBySellerId.get(getSellerUserId(seller));
+		if (byUserId !== undefined) return byUserId;
+		return seller.itemIds?.length ?? 0;
+	};
 	const getUserIdValue = (userId: Seller["userId"]) => {
 		if (typeof userId === "string") {
 			return userId;
@@ -236,7 +254,7 @@ export default function SellersPage() {
 			key: "itemIds",
 			header: "Items",
 			render: (seller) => (
-				<span className="font-medium">{seller.itemIds?.length ?? 0}</span>
+				<span className="font-medium">{getItemCountForSeller(seller)}</span>
 			),
 		},
 		{
@@ -326,17 +344,21 @@ export default function SellersPage() {
 		const phoneNumber = formatPhoneNumber(
 			String(formData.get("phoneNumber") || ""),
 		);
-		const createPayload = {
+		const street = String(formData.get("street") || "").trim();
+		const block = String(formData.get("block") || "").trim();
+		const house = String(formData.get("house") || "").trim();
+		const flat = String(formData.get("flat") || "").trim();
+		const createPayload: Record<string, unknown> = {
 			password,
 			emailAddress,
 			phoneNumber,
 			address: {
-				street: String(formData.get("street") || ""),
+				street,
 				city: formCity,
-				block: String(formData.get("block") || ""),
+				block,
 				governorate: formGovernorate,
-				house: String(formData.get("house") || ""),
-				flat: String(formData.get("flat") || ""),
+				house,
+				...(flat ? { flat } : {}),
 			},
 			roles: ["SELLER"],
 			cardIds: [],
@@ -374,6 +396,56 @@ export default function SellersPage() {
 					return;
 				}
 				await restApi.sellers.update(id, updatePayload);
+				// Sync item.seller_id so Items page and item count reflect the assignment (seller document _id)
+				const sellerDocId = editingSeller._id;
+				const previousItemIds = editingSeller.itemIds ?? [];
+				const itemSyncErrors: string[] = [];
+				let firstErrorMessage: string | null = null;
+				// Try PATCH first (partial update); fallback to PUT with minimal payload. Send both seller_id and sellerId for backend compatibility.
+				const assignPayload = { seller_id: sellerDocId, sellerId: sellerDocId };
+				const unassignPayload = { seller_id: null, sellerId: null };
+				const updateItemSeller = async (
+					itemId: string,
+					payload: { seller_id: string | null; sellerId: string | null },
+				): Promise<void> => {
+					try {
+						await restApi.items.patch(itemId, payload);
+					} catch (patchErr) {
+						const msg = patchErr instanceof Error ? patchErr.message : String(patchErr);
+						if (!firstErrorMessage) firstErrorMessage = msg;
+						try {
+							await restApi.items.update(itemId, payload as Partial<Item>);
+						} catch (putErr) {
+							if (!firstErrorMessage) firstErrorMessage = putErr instanceof Error ? putErr.message : String(putErr);
+							throw putErr;
+						}
+					}
+				};
+				for (const itemId of selectedItemIds) {
+					try {
+						await updateItemSeller(itemId, assignPayload);
+					} catch (e) {
+						console.error("Failed to set item seller_id:", itemId, e);
+						itemSyncErrors.push(itemId);
+					}
+				}
+				for (const itemId of previousItemIds) {
+					if (selectedItemIds.includes(itemId)) continue;
+					try {
+						await updateItemSeller(itemId, unassignPayload);
+					} catch (e) {
+						console.error("Failed to clear item seller_id:", itemId, e);
+						itemSyncErrors.push(itemId);
+					}
+				}
+				if (itemSyncErrors.length > 0) {
+					setFormError(
+						firstErrorMessage
+							? `Seller saved, but ${itemSyncErrors.length} item(s) could not be assigned: ${firstErrorMessage}`
+							: `Seller saved, but ${itemSyncErrors.length} item(s) could not be assigned. Ensure the backend supports PATCH or PUT on /api/items/{id} with seller_id or sellerId.`,
+					);
+					return;
+				}
 			} else {
 				const createdUser = await restApi.users.create(createPayload);
 				// id = user ID (backend accepts seller _id or user ID)
@@ -543,7 +615,7 @@ export default function SellersPage() {
 									<span className="text-sm text-muted-foreground">Items</span>
 								</div>
 								<p className="text-lg font-semibold">
-									{selectedSeller.itemIds?.length ?? 0}
+									{getItemCountForSeller(selectedSeller)}
 								</p>
 							</div>
 							<div className="p-3 bg-muted/30 rounded-lg col-span-2">
@@ -608,7 +680,7 @@ export default function SellersPage() {
 											{selectedSeller.sellerPolicyAcceptedAt
 												? new Date(
 														selectedSeller.sellerPolicyAcceptedAt,
-												  ).toLocaleDateString()
+													).toLocaleDateString()
 												: "—"}
 										</p>
 									</div>
@@ -620,6 +692,17 @@ export default function SellersPage() {
 							className="w-full"
 							onClick={() => {
 								setEditingSeller(selectedSeller);
+								setFormStep(1);
+								setFormPreferredPickupDate(
+									selectedSeller.preferredPickupDate
+										? new Date(selectedSeller.preferredPickupDate)
+										: undefined,
+								);
+								setFormPolicyAcceptedAt(
+									selectedSeller.sellerPolicyAcceptedAt
+										? new Date(selectedSeller.sellerPolicyAcceptedAt)
+										: undefined,
+								);
 								setSelectedItemIds(selectedSeller.itemIds ?? []);
 								setFormUserId(getUserIdValue(selectedSeller.userId));
 								setUserSearch("");
@@ -685,356 +768,367 @@ export default function SellersPage() {
 							<div className={formStep !== 1 ? "hidden" : undefined}>
 								<div className="space-y-2">
 									<Label>User</Label>
-										<Input
-											value={userSearch}
-											onChange={(event) => setUserSearch(event.target.value)}
-											placeholder="Search users..."
-										/>
-										<Select
-											value={formUserId || "__placeholder__"}
-											onValueChange={(value) =>
-												setFormUserId(value === "__placeholder__" ? "" : value)
-											}>
-											<SelectTrigger>
-												<SelectValue placeholder="Select user" />
-											</SelectTrigger>
-											<SelectContent>
-												<SelectItem value="__placeholder__" disabled>
-													Select user
-												</SelectItem>
-												{filteredUsers.length === 0 && (
+									<Input
+										value={userSearch}
+										onChange={(event) => setUserSearch(event.target.value)}
+										placeholder="Search users..."
+									/>
+									<Select
+										value={
+											formUserId &&
+											(filteredUsers.some((u) => u._id === formUserId) ||
+												(editingSeller &&
+													getUserIdValue(editingSeller.userId) === formUserId))
+												? formUserId
+												: "__placeholder__"
+										}
+										onValueChange={(value) =>
+											setFormUserId(value === "__placeholder__" ? "" : value)
+										}>
+										<SelectTrigger>
+											<SelectValue placeholder="Select user" />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="__placeholder__" disabled>
+												Select user
+											</SelectItem>
+											{editingSeller &&
+												formUserId &&
+												!filteredUsers.some((u) => u._id === formUserId) && (
+													<SelectItem value={formUserId}>
+														{getUserIdLabel(editingSeller.userId)}
+													</SelectItem>
+												)}
+											{filteredUsers.length === 0 &&
+												!(editingSeller && formUserId) && (
 													<SelectItem value="__none__" disabled>
 														No users found
 													</SelectItem>
 												)}
-												{filteredUsers.map((user) => (
-													<SelectItem key={user._id} value={user._id}>
-														{userLabelById.get(user._id) ?? user._id}
-													</SelectItem>
-												))}
-											</SelectContent>
-										</Select>
-									</div>
+											{filteredUsers.map((user) => (
+												<SelectItem key={user._id} value={user._id}>
+													{userLabelById.get(user._id) ?? user._id}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+								</div>
+								<div className="space-y-2">
+									<Label htmlFor="iban">IBAN</Label>
+									<Input
+										id="IBAN"
+										name="IBAN"
+										defaultValue={editingSeller?.IBAN}
+										placeholder="Enter IBAN"
+									/>
+								</div>
+								<div className="grid grid-cols-2 gap-4">
 									<div className="space-y-2">
-										<Label htmlFor="iban">IBAN</Label>
+										<Label htmlFor="balance">Balance</Label>
 										<Input
-											id="IBAN"
-											name="IBAN"
-											defaultValue={editingSeller?.IBAN}
-											placeholder="Enter IBAN"
-										/>
-									</div>
-									<div className="grid grid-cols-2 gap-4">
-										<div className="space-y-2">
-											<Label htmlFor="balance">Balance</Label>
-											<Input
-												id="balance"
-												name="balance"
-												type="number"
-												defaultValue={editingSeller?.balance || 0}
-												min={0}
-											/>
-										</div>
-										<div className="space-y-2">
-											<Label htmlFor="status">Status</Label>
-											<Select
-												defaultValue={
-													editingSeller?.isDeactivated ? "inactive" : "active"
-												}
-												onValueChange={(value) => {
-													const field = document.querySelector<HTMLInputElement>(
-														'input[name="isDeactivated"]',
-													);
-													if (field) {
-														field.value = value === "inactive" ? "on" : "off";
-													}
-												}}>
-												<SelectTrigger>
-													<SelectValue placeholder="Select status" />
-												</SelectTrigger>
-												<SelectContent>
-													<SelectItem value="active">Active</SelectItem>
-													<SelectItem value="inactive">Inactive</SelectItem>
-												</SelectContent>
-											</Select>
-											<input
-												type="hidden"
-												name="isDeactivated"
-												defaultValue={editingSeller?.isDeactivated ? "on" : "off"}
-											/>
-										</div>
-									</div>
-							</div>
-							<div className={formStep !== 2 ? "hidden" : undefined}>
-									<div className="space-y-2">
-										<Label htmlFor="qrCode">QR Code</Label>
-										<Input
-											id="qrCode"
-											name="qrCode"
-											defaultValue={editingSeller?.qrCode}
-											placeholder="QR Code"
+											id="balance"
+											name="balance"
+											type="number"
+											defaultValue={editingSeller?.balance || 0}
+											min={0}
 										/>
 									</div>
 									<div className="space-y-2">
-										<Label>Preferred pickup date</Label>
-										<DatePicker
-											value={formPreferredPickupDate}
-											onChange={setFormPreferredPickupDate}
-											placeholder="Select date"
-										/>
-									</div>
-									<div className="space-y-2">
-										<Label htmlFor="consentGiven" className="text-sm font-medium">
-											Consent Given
-										</Label>
-										<label
-											htmlFor="consentGiven"
-											className="flex h-10 cursor-pointer items-center gap-3 rounded-md border border-input bg-background px-3 text-sm ring-offset-background has-[:focus]:ring-2 has-[:focus]:ring-ring has-[:focus]:ring-offset-2">
-											<input
-												type="checkbox"
-												id="consentGiven"
-												name="consentGiven"
-												defaultChecked={editingSeller?.consentGiven}
-												className="h-4 w-4 rounded border border-input accent-primary"
-											/>
-											<span>Consent Given</span>
-										</label>
-									</div>
-							</div>
-							<div className={formStep !== 3 ? "hidden" : undefined}>
-									<div className="space-y-2">
-										<Label htmlFor="escalationStatus">Escalation status</Label>
+										<Label htmlFor="status">Status</Label>
 										<Select
-											value={escalationStatusSelectValue}
+											defaultValue={
+												editingSeller?.isDeactivated ? "inactive" : "active"
+											}
 											onValueChange={(value) => {
-												setEscalationStatusSelectValue(value);
-												const el = document.querySelector<HTMLInputElement>(
-													'input[name="escalationStatus"]',
+												const field = document.querySelector<HTMLInputElement>(
+													'input[name="isDeactivated"]',
 												);
-												if (el) el.value = value === "__none__" ? "" : value;
+												if (field) {
+													field.value = value === "inactive" ? "on" : "off";
+												}
 											}}>
 											<SelectTrigger>
-												<SelectValue placeholder="None" />
+												<SelectValue placeholder="Select status" />
 											</SelectTrigger>
 											<SelectContent>
-												<SelectItem value="__none__">None</SelectItem>
-												<SelectItem value="seller_no_response">
-													Seller no response
-												</SelectItem>
-												<SelectItem value="escalated">Escalated</SelectItem>
-												<SelectItem value="resolved">Resolved</SelectItem>
+												<SelectItem value="active">Active</SelectItem>
+												<SelectItem value="inactive">Inactive</SelectItem>
 											</SelectContent>
 										</Select>
 										<input
 											type="hidden"
-											name="escalationStatus"
-											value={
-												escalationStatusSelectValue === "__none__"
-													? ""
-													: escalationStatusSelectValue
-											}
-											readOnly
-											aria-hidden
+											name="isDeactivated"
+											defaultValue={editingSeller?.isDeactivated ? "on" : "off"}
 										/>
 									</div>
-									<div className="space-y-2">
-										<Label htmlFor="escalationNotes">Escalation notes</Label>
-										<Input
-											id="escalationNotes"
-											name="escalationNotes"
-											defaultValue={editingSeller?.escalationNotes ?? ""}
-											placeholder="Notes"
+								</div>
+							</div>
+							<div className={formStep !== 2 ? "hidden" : undefined}>
+								<div className="space-y-2">
+									<Label htmlFor="qrCode">QR Code</Label>
+									<Input
+										id="qrCode"
+										name="qrCode"
+										defaultValue={editingSeller?.qrCode}
+										placeholder="QR Code"
+									/>
+								</div>
+								<div className="space-y-2">
+									<Label>Preferred pickup date</Label>
+									<DatePicker
+										value={formPreferredPickupDate}
+										onChange={setFormPreferredPickupDate}
+										placeholder="Select date"
+									/>
+								</div>
+								<div className="space-y-2">
+									<Label htmlFor="consentGiven" className="text-sm font-medium">
+										Consent Given
+									</Label>
+									<label
+										htmlFor="consentGiven"
+										className="flex h-10 cursor-pointer items-center gap-3 rounded-md border border-input bg-background px-3 text-sm ring-offset-background has-[:focus]:ring-2 has-[:focus]:ring-ring has-[:focus]:ring-offset-2">
+										<input
+											type="checkbox"
+											id="consentGiven"
+											name="consentGiven"
+											defaultChecked={editingSeller?.consentGiven}
+											className="h-4 w-4 rounded border border-input accent-primary"
 										/>
+										<span>Consent Given</span>
+									</label>
+								</div>
+							</div>
+							<div className={formStep !== 3 ? "hidden" : undefined}>
+								<div className="space-y-2">
+									<Label htmlFor="escalationStatus">Escalation status</Label>
+									<Select
+										value={escalationStatusSelectValue}
+										onValueChange={(value) => {
+											setEscalationStatusSelectValue(value);
+											const el = document.querySelector<HTMLInputElement>(
+												'input[name="escalationStatus"]',
+											);
+											if (el) el.value = value === "__none__" ? "" : value;
+										}}>
+										<SelectTrigger>
+											<SelectValue placeholder="None" />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="__none__">None</SelectItem>
+											<SelectItem value="seller_no_response">
+												Seller no response
+											</SelectItem>
+											<SelectItem value="escalated">Escalated</SelectItem>
+											<SelectItem value="resolved">Resolved</SelectItem>
+										</SelectContent>
+									</Select>
+									<input
+										type="hidden"
+										name="escalationStatus"
+										value={
+											escalationStatusSelectValue === "__none__"
+												? ""
+												: escalationStatusSelectValue
+										}
+										readOnly
+										aria-hidden
+									/>
+								</div>
+								<div className="space-y-2">
+									<Label htmlFor="escalationNotes">Escalation notes</Label>
+									<Input
+										id="escalationNotes"
+										name="escalationNotes"
+										defaultValue={editingSeller?.escalationNotes ?? ""}
+										placeholder="Notes"
+									/>
+								</div>
+								<div className="space-y-2">
+									<Label>Policy accepted at</Label>
+									<DateTimePicker
+										value={formPolicyAcceptedAt}
+										onChange={setFormPolicyAcceptedAt}
+										placeholder="Select date and time"
+									/>
+								</div>
+								<div className="space-y-2">
+									<Label>Items</Label>
+									<Input
+										value={itemSearch}
+										onChange={(event) => setItemSearch(event.target.value)}
+										placeholder="Search items..."
+									/>
+									<div className="border border-input rounded-md p-3 max-h-56 overflow-y-auto space-y-2">
+										{filteredItems.length === 0 && (
+											<p className="text-sm text-muted-foreground">
+												No items found.
+											</p>
+										)}
+										{filteredItems.map((item) => (
+											<label
+												key={item._id}
+												className="flex items-center gap-3 text-sm text-foreground">
+												<Checkbox
+													checked={selectedItemIds.includes(item._id)}
+													onCheckedChange={(checked) => {
+														setSelectedItemIds((prev) => {
+															if (checked) {
+																return prev.includes(item._id)
+																	? prev
+																	: [...prev, item._id];
+															}
+															return prev.filter((id) => id !== item._id);
+														});
+													}}
+												/>
+												<span className="truncate">
+													{itemLabelById.get(item._id)}
+												</span>
+											</label>
+										))}
 									</div>
-									<div className="space-y-2">
-										<Label>Policy accepted at</Label>
-										<DateTimePicker
-											value={formPolicyAcceptedAt}
-											onChange={setFormPolicyAcceptedAt}
-											placeholder="Select date and time"
-										/>
-									</div>
-									<div className="space-y-2">
-										<Label>Items</Label>
-										<Input
-											value={itemSearch}
-											onChange={(event) => setItemSearch(event.target.value)}
-											placeholder="Search items..."
-										/>
-										<div className="border border-input rounded-md p-3 max-h-56 overflow-y-auto space-y-2">
-											{filteredItems.length === 0 && (
-												<p className="text-sm text-muted-foreground">
-													No items found.
-												</p>
-											)}
-											{filteredItems.map((item) => (
-												<label
-													key={item._id}
-													className="flex items-center gap-3 text-sm text-foreground">
-													<Checkbox
-														checked={selectedItemIds.includes(item._id)}
-														onCheckedChange={(checked) => {
-															setSelectedItemIds((prev) => {
-																if (checked) {
-																	return prev.includes(item._id)
-																		? prev
-																		: [...prev, item._id];
-																}
-																return prev.filter((id) => id !== item._id);
-															});
-														}}
-													/>
-													<span className="truncate">
-														{itemLabelById.get(item._id)}
-													</span>
-												</label>
-											))}
-										</div>
-									</div>
+								</div>
 							</div>
 						</>
 					) : (
 						<>
-							{formStep === 1 && (
-								<>
-									<div className="grid grid-cols-2 gap-4">
-										<div className="space-y-2">
-											<Label htmlFor="emailAddress">Email</Label>
-											<Input
-												id="emailAddress"
-												name="emailAddress"
-												type="email"
-												placeholder="seller@example.com"
-												required
-											/>
-										</div>
-										<div className="space-y-2">
-											<Label htmlFor="phoneNumber">Phone</Label>
-											<Input
-												id="phoneNumber"
-												name="phoneNumber"
-												placeholder="66651092"
-												required
-											/>
-										</div>
-									</div>
+							{/* Create flow: render all steps, hide inactive so data is kept when switching steps */}
+							<div className={formStep !== 1 ? "hidden" : undefined}>
+								<div className="grid grid-cols-2 gap-4">
 									<div className="space-y-2">
-										<Label htmlFor="password">Password</Label>
+										<Label htmlFor="emailAddress">Email</Label>
 										<Input
-											id="password"
-											name="password"
-											type="password"
-											placeholder="P@ssw0rd123!"
+											id="emailAddress"
+											name="emailAddress"
+											type="email"
+											placeholder="seller@example.com"
 											required
 										/>
 									</div>
-								</>
-							)}
-							{formStep === 2 && (
-								<>
-									<div className="grid grid-cols-2 gap-4">
-										<div className="space-y-2">
-											<Label>Governorate</Label>
-											<Select
-												value={formGovernorate}
-												onValueChange={(value) => setFormGovernorate(value)}>
-												<SelectTrigger>
-													<SelectValue placeholder="Select governorate" />
-												</SelectTrigger>
-												<SelectContent>
-													{governorateOptions.length === 0 && (
-														<SelectItem value="__none__" disabled>
-															No governorates found
-														</SelectItem>
-													)}
-													{governorateOptions.map(({ value, label }) => (
-														<SelectItem key={value} value={value}>
-															{label}
-														</SelectItem>
-													))}
-												</SelectContent>
-											</Select>
-											<input
-												type="hidden"
-												name="governorate"
-												value={formGovernorate}
-											/>
-										</div>
-										<div className="space-y-2">
-											<Label>City</Label>
-											<Select
-												value={formCity}
-												onValueChange={(value) => setFormCity(value)}>
-												<SelectTrigger>
-													<SelectValue placeholder="Select city" />
-												</SelectTrigger>
-												<SelectContent>
-													{cityOptions.length === 0 && (
-														<SelectItem value="__none__" disabled>
-															No cities found
-														</SelectItem>
-													)}
-													{cityOptions.map(({ value, label }) => (
-														<SelectItem key={value} value={value}>
-															{label}
-														</SelectItem>
-													))}
-												</SelectContent>
-											</Select>
-											<input type="hidden" name="city" value={formCity} />
-										</div>
-									</div>
-									<div className="grid grid-cols-2 gap-4">
-										<div className="space-y-2">
-											<Label htmlFor="street">Street</Label>
-											<Input id="street" name="street" placeholder="Street" />
-										</div>
-										<div className="space-y-2">
-											<Label htmlFor="block">Block</Label>
-											<Input id="block" name="block" placeholder="Block" />
-										</div>
-									</div>
-									<div className="grid grid-cols-2 gap-4">
-										<div className="space-y-2">
-											<Label htmlFor="house">House</Label>
-											<Input id="house" name="house" placeholder="House" />
-										</div>
-										<div className="space-y-2">
-											<Label htmlFor="flat">Flat</Label>
-											<Input id="flat" name="flat" placeholder="Flat" />
-										</div>
-									</div>
-								</>
-							)}
-							{formStep === 3 && (
-								<>
 									<div className="space-y-2">
-										<Label>Preferred pickup date</Label>
-										<DatePicker
-											value={formPreferredPickupDate}
-											onChange={setFormPreferredPickupDate}
-											placeholder="Select date"
+										<Label htmlFor="phoneNumber">Phone</Label>
+										<Input
+											id="phoneNumber"
+											name="phoneNumber"
+											placeholder="66651092"
+											required
+										/>
+									</div>
+								</div>
+								<div className="space-y-2">
+									<Label htmlFor="password">Password</Label>
+									<Input
+										id="password"
+										name="password"
+										type="password"
+										placeholder="P@ssw0rd123!"
+										required
+									/>
+								</div>
+							</div>
+							<div className={formStep !== 2 ? "hidden" : undefined}>
+								<div className="grid grid-cols-2 gap-4">
+									<div className="space-y-2">
+										<Label>Governorate</Label>
+										<Select
+											value={formGovernorate}
+											onValueChange={(value) => setFormGovernorate(value)}>
+											<SelectTrigger>
+												<SelectValue placeholder="Select governorate" />
+											</SelectTrigger>
+											<SelectContent>
+												{governorateOptions.length === 0 && (
+													<SelectItem value="__none__" disabled>
+														No governorates found
+													</SelectItem>
+												)}
+												{governorateOptions.map(({ value, label }) => (
+													<SelectItem key={value} value={value}>
+														{label}
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
+										<input
+											type="hidden"
+											name="governorate"
+											value={formGovernorate}
 										/>
 									</div>
 									<div className="space-y-2">
-										<Label htmlFor="consentGivenStep3" className="text-sm font-medium">
-											Consent Given
-										</Label>
-										<label
-											htmlFor="consentGivenStep3"
-											className="flex h-10 cursor-pointer items-center gap-3 rounded-md border border-input bg-background px-3 text-sm ring-offset-background has-[:focus]:ring-2 has-[:focus]:ring-ring has-[:focus]:ring-offset-2">
-											<input
-												type="checkbox"
-												id="consentGivenStep3"
-												name="consentGiven"
-												defaultChecked={editingSeller?.consentGiven}
-												className="h-4 w-4 rounded border border-input accent-primary"
-											/>
-											<span>Consent Given</span>
-										</label>
+										<Label>City</Label>
+										<Select
+											value={formCity}
+											onValueChange={(value) => setFormCity(value)}>
+											<SelectTrigger>
+												<SelectValue placeholder="Select city" />
+											</SelectTrigger>
+											<SelectContent>
+												{cityOptions.length === 0 && (
+													<SelectItem value="__none__" disabled>
+														No cities found
+													</SelectItem>
+												)}
+												{cityOptions.map(({ value, label }) => (
+													<SelectItem key={value} value={value}>
+														{label}
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
+										<input type="hidden" name="city" value={formCity} />
 									</div>
-								</>
-							)}
+								</div>
+								<div className="grid grid-cols-2 gap-4">
+									<div className="space-y-2">
+										<Label htmlFor="street">Street</Label>
+										<Input id="street" name="street" placeholder="Street" />
+									</div>
+									<div className="space-y-2">
+										<Label htmlFor="block">Block</Label>
+										<Input id="block" name="block" placeholder="Block" />
+									</div>
+								</div>
+								<div className="grid grid-cols-2 gap-4">
+									<div className="space-y-2">
+										<Label htmlFor="house">House</Label>
+										<Input id="house" name="house" placeholder="House" />
+									</div>
+									<div className="space-y-2">
+										<Label htmlFor="flat">Flat</Label>
+										<Input id="flat" name="flat" placeholder="Flat" />
+									</div>
+								</div>
+							</div>
+							<div className={formStep !== 3 ? "hidden" : undefined}>
+								<div className="space-y-2">
+									<Label>Preferred pickup date</Label>
+									<DatePicker
+										value={formPreferredPickupDate}
+										onChange={setFormPreferredPickupDate}
+										placeholder="Select date"
+									/>
+								</div>
+								<div className="space-y-2">
+									<Label
+										htmlFor="consentGivenStep3"
+										className="text-sm font-medium">
+										Consent Given
+									</Label>
+									<label
+										htmlFor="consentGivenStep3"
+										className="flex h-10 cursor-pointer items-center gap-3 rounded-md border border-input bg-background px-3 text-sm ring-offset-background has-[:focus]:ring-2 has-[:focus]:ring-ring has-[:focus]:ring-offset-2">
+										<input
+											type="checkbox"
+											id="consentGivenStep3"
+											name="consentGiven"
+											className="h-4 w-4 rounded border border-input accent-primary"
+										/>
+										<span>Consent Given</span>
+									</label>
+								</div>
+							</div>
 						</>
 					)}
 					<div className="flex gap-3 pt-4">

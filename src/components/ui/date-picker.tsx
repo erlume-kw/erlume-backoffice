@@ -25,6 +25,10 @@ export interface DatePickerProps {
 	id?: string;
 }
 
+function isValidDate(d: Date | null | undefined): d is Date {
+	return d instanceof Date && !Number.isNaN(d.getTime());
+}
+
 export function DatePicker({
 	value,
 	onChange,
@@ -33,6 +37,7 @@ export function DatePicker({
 	disabled,
 	id,
 }: DatePickerProps) {
+	const safeValue = isValidDate(value) ? value : undefined;
 	return (
 		<Popover>
 			<PopoverTrigger asChild>
@@ -46,13 +51,13 @@ export function DatePicker({
 						className,
 					)}>
 					<CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
-					{value ? format(value, "PPP") : placeholder}
+					{safeValue ? format(safeValue, "PPP") : placeholder}
 				</Button>
 			</PopoverTrigger>
 			<PopoverContent className="w-auto p-0" align="start">
 				<Calendar
 					mode="single"
-					selected={value ?? undefined}
+					selected={safeValue}
 					onSelect={onChange}
 					initialFocus
 				/>
@@ -83,9 +88,16 @@ export function DateTimePicker({
 	id,
 }: DateTimePickerProps) {
 	const [open, setOpen] = React.useState(false);
-	const dateOnly = value ? new Date(value.getFullYear(), value.getMonth(), value.getDate()) : undefined;
-	const timeValue = value
-		? `${padTwo(value.getHours())}:${padTwo(value.getMinutes())}`
+	const safeValue = isValidDate(value) ? value : undefined;
+	const dateOnly = safeValue
+		? new Date(
+				safeValue.getFullYear(),
+				safeValue.getMonth(),
+				safeValue.getDate(),
+			)
+		: undefined;
+	const timeValue = safeValue
+		? `${padTwo(safeValue.getHours())}:${padTwo(safeValue.getMinutes())}`
 		: "00:00";
 
 	const handleDateSelect = (d: Date | undefined) => {
@@ -93,7 +105,7 @@ export function DateTimePicker({
 			onChange?.(undefined);
 			return;
 		}
-		const prev = value ?? new Date();
+		const prev = safeValue ?? new Date();
 		const next = new Date(d);
 		next.setHours(prev.getHours(), prev.getMinutes(), 0, 0);
 		onChange?.(next);
@@ -103,7 +115,7 @@ export function DateTimePicker({
 		const v = e.target.value;
 		if (!v) return;
 		const [h, m] = v.split(":").map(Number);
-		const base = value ?? new Date();
+		const base = safeValue ?? new Date();
 		const next = new Date(base);
 		next.setHours(isNaN(h) ? 0 : h, isNaN(m) ? 0 : m, 0, 0);
 		onChange?.(next);
@@ -122,7 +134,7 @@ export function DateTimePicker({
 						className,
 					)}>
 					<CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
-					{value ? format(value, "PPP p") : placeholder}
+					{safeValue ? format(safeValue, "PPP p") : placeholder}
 				</Button>
 			</PopoverTrigger>
 			<PopoverContent className="w-auto p-0" align="start">

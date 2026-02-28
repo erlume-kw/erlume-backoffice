@@ -188,16 +188,15 @@ export default function OrdersPage() {
 			);
 		});
 	}, [userLabelById, userSearch, users]);
-	// Always use catalog so we send API-valid values: pending, processing, shipped, delivered, cancelled, returned
-	const orderStatusValues = getEnumValues("orderStatus");
-	const orderStatusOptions = getEnumOptions("orderStatus");
+	const orderStatusValues = getEnumValues("orderStatus", orderStatus);
+	const orderStatusOptions = getEnumOptions("orderStatus", orderStatusValues);
 	const normalizeStatusValue = (value: string) =>
 		value.toLowerCase().replace(/\s+/g, "_").trim();
 	const orderStatusForApi = (value: string): string => {
 		const normalized = normalizeStatusValue(value);
 		return orderStatusValues.includes(normalized)
 			? normalized
-			: orderStatusValues[0] ?? "pending";
+			: (orderStatusValues[0] ?? "pending");
 	};
 
 	useEffect(() => {
@@ -660,147 +659,149 @@ export default function OrdersPage() {
 							</Select>
 						</div>
 					)}
-					<div className="space-y-2">
-						<Label>Items</Label>
-						<Input
-							value={itemSearch}
-							onChange={(event) => setItemSearch(event.target.value)}
-							placeholder="Search items..."
-						/>
-						<div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-							<span>
-								Selected {selectedSummary.count} · Qty{" "}
-								{selectedSummary.quantity}
-								{" · "}Total {selectedSummary.total.toFixed(2)}
-							</span>
-							<div className="flex items-center gap-2">
-								<label className="flex items-center gap-2">
-									<Checkbox
-										checked={showSelectedOnly}
-										onCheckedChange={(checked) =>
-											setShowSelectedOnly(Boolean(checked))
-										}
-									/>
-									<span>Show selected</span>
-								</label>
-								<Button
-									type="button"
-									variant="outline"
-									size="sm"
-									onClick={() => {
-										setOrderItemSelections((prev) => {
-											const next = { ...prev };
-											filteredItems.forEach((item) => {
-												const current = next[item._id] ?? {
-													selected: false,
-													quantity: 1,
-													price: Number(item.basePrice || 0),
-												};
-												next[item._id] = { ...current, selected: true };
+					{!editingOrder && (
+						<div className="space-y-2">
+							<Label>Items</Label>
+							<Input
+								value={itemSearch}
+								onChange={(event) => setItemSearch(event.target.value)}
+								placeholder="Search items..."
+							/>
+							<div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+								<span>
+									Selected {selectedSummary.count} · Qty{" "}
+									{selectedSummary.quantity}
+									{" · "}Total {selectedSummary.total.toFixed(2)}
+								</span>
+								<div className="flex items-center gap-2">
+									<label className="flex items-center gap-2">
+										<Checkbox
+											checked={showSelectedOnly}
+											onCheckedChange={(checked) =>
+												setShowSelectedOnly(Boolean(checked))
+											}
+										/>
+										<span>Show selected</span>
+									</label>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										onClick={() => {
+											setOrderItemSelections((prev) => {
+												const next = { ...prev };
+												filteredItems.forEach((item) => {
+													const current = next[item._id] ?? {
+														selected: false,
+														quantity: 1,
+														price: Number(item.basePrice || 0),
+													};
+													next[item._id] = { ...current, selected: true };
+												});
+												return next;
 											});
-											return next;
-										});
-									}}>
-									Select all filtered
-								</Button>
-								<Button
-									type="button"
-									variant="ghost"
-									size="sm"
-									onClick={() => {
-										setOrderItemSelections((prev) =>
-											Object.fromEntries(
-												Object.entries(prev).map(([id, value]) => [
-													id,
-													{ ...value, selected: false },
-												]),
-											),
-										);
-									}}>
-									Clear all
-								</Button>
+										}}>
+										Select all filtered
+									</Button>
+									<Button
+										type="button"
+										variant="ghost"
+										size="sm"
+										onClick={() => {
+											setOrderItemSelections((prev) =>
+												Object.fromEntries(
+													Object.entries(prev).map(([id, value]) => [
+														id,
+														{ ...value, selected: false },
+													]),
+												),
+											);
+										}}>
+										Clear all
+									</Button>
+								</div>
+							</div>
+							<div className="border border-input rounded-md p-3 max-h-64 overflow-y-auto space-y-2 bg-background">
+								{displayItems.length === 0 && (
+									<p className="text-sm text-muted-foreground">No items found.</p>
+								)}
+								{displayItems.map((item) => {
+									const selection = orderItemSelections[item._id] ?? {
+										selected: false,
+										quantity: 1,
+										price: Number(item.basePrice || 0),
+									};
+									return (
+										<label
+											key={item._id}
+											className="grid grid-cols-1 sm:grid-cols-[auto,1fr,auto,auto] items-start sm:items-center gap-3 text-sm text-foreground">
+											<Checkbox
+												checked={selection.selected}
+												onCheckedChange={(checked) => {
+													setOrderItemSelections((prev) => ({
+														...prev,
+														[item._id]: {
+															...selection,
+															selected: Boolean(checked),
+														},
+													}));
+												}}
+											/>
+											<span className="flex-1 truncate">
+												{itemLabelById.get(item._id)}
+											</span>
+											<Input
+												type="number"
+												className="w-24 sm:w-20"
+												min={1}
+												disabled={!selection.selected}
+												value={selection.quantity}
+												onChange={(event) => {
+													const quantity = Math.max(
+														1,
+														Number(event.target.value || 1),
+													);
+													setOrderItemSelections((prev) => ({
+														...prev,
+														[item._id]: {
+															...selection,
+															quantity,
+														},
+													}));
+												}}
+											/>
+											<Input
+												type="number"
+												className="w-32 sm:w-28"
+												min={0}
+												disabled={!selection.selected}
+												value={selection.price}
+												onChange={(event) => {
+													const price = Math.max(
+														0,
+														Number(event.target.value || 0),
+													);
+													setOrderItemSelections((prev) => ({
+														...prev,
+														[item._id]: {
+															...selection,
+															price,
+														},
+													}));
+												}}
+											/>
+										</label>
+									);
+								})}
+							</div>
+							<div className="hidden sm:grid grid-cols-[auto,1fr,auto,auto] gap-3 text-xs text-muted-foreground">
+								<span className="w-5" />
+								<span className="flex-1">Item</span>
+								<span className="w-20">Qty</span>
+								<span className="w-28">Price</span>
 							</div>
 						</div>
-						<div className="border border-input rounded-md p-3 max-h-64 overflow-y-auto space-y-2 bg-background">
-							{displayItems.length === 0 && (
-								<p className="text-sm text-muted-foreground">No items found.</p>
-							)}
-							{displayItems.map((item) => {
-								const selection = orderItemSelections[item._id] ?? {
-									selected: false,
-									quantity: 1,
-									price: Number(item.basePrice || 0),
-								};
-								return (
-									<label
-										key={item._id}
-										className="grid grid-cols-1 sm:grid-cols-[auto,1fr,auto,auto] items-start sm:items-center gap-3 text-sm text-foreground">
-										<Checkbox
-											checked={selection.selected}
-											onCheckedChange={(checked) => {
-												setOrderItemSelections((prev) => ({
-													...prev,
-													[item._id]: {
-														...selection,
-														selected: Boolean(checked),
-													},
-												}));
-											}}
-										/>
-										<span className="flex-1 truncate">
-											{itemLabelById.get(item._id)}
-										</span>
-										<Input
-											type="number"
-											className="w-24 sm:w-20"
-											min={1}
-											disabled={!selection.selected}
-											value={selection.quantity}
-											onChange={(event) => {
-												const quantity = Math.max(
-													1,
-													Number(event.target.value || 1),
-												);
-												setOrderItemSelections((prev) => ({
-													...prev,
-													[item._id]: {
-														...selection,
-														quantity,
-													},
-												}));
-											}}
-										/>
-										<Input
-											type="number"
-											className="w-32 sm:w-28"
-											min={0}
-											disabled={!selection.selected}
-											value={selection.price}
-											onChange={(event) => {
-												const price = Math.max(
-													0,
-													Number(event.target.value || 0),
-												);
-												setOrderItemSelections((prev) => ({
-													...prev,
-													[item._id]: {
-														...selection,
-														price,
-													},
-												}));
-											}}
-										/>
-									</label>
-								);
-							})}
-						</div>
-						<div className="hidden sm:grid grid-cols-[auto,1fr,auto,auto] gap-3 text-xs text-muted-foreground">
-							<span className="w-5" />
-							<span className="flex-1">Item</span>
-							<span className="w-20">Qty</span>
-							<span className="w-28">Price</span>
-						</div>
-					</div>
+					)}
 					<div className="space-y-2">
 						<Label htmlFor="order_status">Status</Label>
 						<Select
