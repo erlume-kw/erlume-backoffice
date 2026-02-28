@@ -14,9 +14,10 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import type { Expense, User } from "@/types/models";
+import type { Employee, Expense } from "@/types/models";
 import { Receipt } from "lucide-react";
 import { restApi } from "@/lib/rest-client";
+import { getEnumOptions, getEnumValues } from "@/lib/enums";
 import { useResourceList } from "@/hooks/use-resource-list";
 
 export default function ExpensesPage() {
@@ -29,15 +30,19 @@ export default function ExpensesPage() {
 	const [formPaidBy, setFormPaidBy] = useState("");
 	const [formRecurring, setFormRecurring] = useState(false);
 	const [formPhase, setFormPhase] = useState("");
-	const [formType, setFormType] = useState(""); // space/newline separated, e.g. supplies subscriptions services
+	const [formType, setFormType] = useState("");
 	const [formError, setFormError] = useState<string | null>(null);
 
 	const loadExpenses = useCallback(
 		() => restApi.expenses.getAll() as Promise<Expense[]>,
 		[],
 	);
-	const loadUsers = useCallback(
-		() => restApi.users.getAll() as Promise<User[]>,
+	const loadEmployees = useCallback(
+		() => restApi.employees.getAll() as Promise<Employee[]>,
+		[],
+	);
+	const loadExpenseTypes = useCallback(
+		() => restApi.enums.getByCategory("expenseType"),
 		[],
 	);
 
@@ -47,13 +52,28 @@ export default function ExpensesPage() {
 		error,
 		reload,
 	} = useResourceList(loadExpenses);
-	const { data: users = [] } = useResourceList(loadUsers);
+	const { data: employees = [] } = useResourceList(loadEmployees);
+	const { data: expenseTypes } = useResourceList(loadExpenseTypes);
 
-	const userLabelById = useMemo(
+	const employeeLabelById = useMemo(
 		() =>
-			new Map(users.map((u) => [u._id, u.emailAddress || u.username || u._id])),
-		[users],
+			new Map(
+				employees.map((e) => [
+					e._id,
+					[e.name, e.role].filter(Boolean).join(" · ") || e._id,
+				]),
+			),
+		[employees],
 	);
+	const expenseTypeValues = getEnumValues("expenseType", expenseTypes);
+	const expenseTypeOptions =
+		expenseTypeValues.length > 0
+			? getEnumOptions("expenseType", expenseTypeValues)
+			: [
+					{ value: "supplies", label: "Supplies" },
+					{ value: "subscriptions", label: "Subscriptions" },
+					{ value: "services", label: "Services" },
+				];
 
 	const columns: Column<Expense>[] = [
 		{
@@ -78,7 +98,7 @@ export default function ExpensesPage() {
 			render: (e) => (
 				<span className="text-sm text-muted-foreground">
 					{e.employee_id
-						? userLabelById.get(e.employee_id) ?? e.employee_id
+						? employeeLabelById.get(e.employee_id) ?? e.employee_id
 						: "—"}
 				</span>
 			),
@@ -135,7 +155,7 @@ export default function ExpensesPage() {
 		);
 	}, [expenses, search]);
 
-	const safeUsers = Array.isArray(users) ? users : [];
+	const safeEmployees = Array.isArray(employees) ? employees : [];
 
 	const handleDelete = async (id: string) => {
 		try {
@@ -165,13 +185,6 @@ export default function ExpensesPage() {
 			return;
 		}
 
-		const typeArr = formType.trim()
-			? formType
-					.split(/\s+/)
-					.map((s) => s.trim())
-					.filter(Boolean)
-			: undefined;
-
 		try {
 			const payload = {
 				name,
@@ -179,7 +192,7 @@ export default function ExpensesPage() {
 				currency: formCurrency || "KWD",
 				...(employee_id && { employee_id }),
 				...(notes && { notes }),
-				...(typeArr && typeArr.length > 0 && { type: typeArr }),
+				...(formType && { type: [formType] }),
 				month: new Date(monthRaw + "-01").toISOString(),
 				...(formPaidBy.trim() && { paidBy: formPaidBy.trim() }),
 				isRecurring: formRecurring,
@@ -220,6 +233,11 @@ export default function ExpensesPage() {
 				onAdd={() => {
 					setEditingExpense(null);
 					setFormEmployeeId("");
+					setFormCurrency("KWD");
+					setFormPaidBy("");
+					setFormRecurring(false);
+					setFormPhase("");
+					setFormType("");
 					setFormError(null);
 					setShowForm(true);
 				}}
@@ -244,9 +262,7 @@ export default function ExpensesPage() {
 						setFormPaidBy(e.paidBy ?? "");
 						setFormRecurring(e.isRecurring ?? false);
 						setFormPhase(e.phase ?? "");
-						setFormType(
-							Array.isArray(e.type) ? e.type.join(" ") : e.type ?? "",
-						);
+						setFormType(Array.isArray(e.type) ? (e.type[0] ?? "") : e.type ?? "");
 						setFormError(null);
 						setShowForm(true);
 					}}
@@ -280,7 +296,7 @@ export default function ExpensesPage() {
 								<p className="text-xs text-muted-foreground">Employee</p>
 								<p className="text-sm">
 									{selectedExpense.employee_id
-										? userLabelById.get(selectedExpense.employee_id) ??
+								? employeeLabelById.get(selectedExpense.employee_id) ??
 										  selectedExpense.employee_id
 										: "—"}
 								</p>
@@ -343,7 +359,7 @@ export default function ExpensesPage() {
 								setFormPhase(selectedExpense.phase ?? "");
 								setFormType(
 									Array.isArray(selectedExpense.type)
-										? selectedExpense.type.join(" ")
+										? (selectedExpense.type[0] ?? "")
 										: selectedExpense.type ?? "",
 								);
 								setSelectedExpense(null);
@@ -414,7 +430,7 @@ export default function ExpensesPage() {
 						<Label>Employee</Label>
 						<Select
 							value={
-								(editingExpense?.employee_id ?? formEmployeeId) || "__none__"
+								formEmployeeId || "__none__"
 							}
 							onValueChange={(v) =>
 								setFormEmployeeId(v === "__none__" ? "" : v)
@@ -424,9 +440,9 @@ export default function ExpensesPage() {
 							</SelectTrigger>
 							<SelectContent>
 								<SelectItem value="__none__">None</SelectItem>
-								{safeUsers.map((u) => (
-									<SelectItem key={u._id} value={u._id}>
-										{userLabelById.get(u._id) ?? u._id}
+								{safeEmployees.map((e) => (
+									<SelectItem key={e._id} value={e._id}>
+										{employeeLabelById.get(e._id) ?? e._id}
 									</SelectItem>
 								))}
 							</SelectContent>
@@ -477,14 +493,24 @@ export default function ExpensesPage() {
 						/>
 					</div>
 					<div className="space-y-2">
-						<Label htmlFor="type">Type (space-separated)</Label>
-						<Input
-							id="type"
-							name="type"
-							value={formType}
-							onChange={(e) => setFormType(e.target.value)}
-							placeholder="e.g. supplies subscriptions services"
-						/>
+						<Label>Type</Label>
+						<Select
+							value={formType || "__none__"}
+							onValueChange={(value) =>
+								setFormType(value === "__none__" ? "" : value)
+							}>
+							<SelectTrigger>
+								<SelectValue placeholder="Select expense type" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="__none__">None</SelectItem>
+								{expenseTypeOptions.map(({ value, label }) => (
+									<SelectItem key={value} value={value}>
+										{label}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
 					</div>
 					<div className="space-y-2">
 						<Label htmlFor="notes">Notes</Label>

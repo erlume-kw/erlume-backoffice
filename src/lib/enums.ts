@@ -17,7 +17,8 @@ export type EnumCatalogKey =
 	| "kuwaitCity"
 	| "transactionStatus"
 	| "paymentMethod"
-	| "bagBrand";
+	| "bagBrand"
+	| "expenseType";
 
 export type SelectOption = {
 	value: string;

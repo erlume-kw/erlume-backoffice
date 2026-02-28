@@ -15,12 +15,34 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import type { Income, Item, Order, Seller } from "@/types/models";
+import type { Income, Item, Order, Seller, User } from "@/types/models";
 import { DollarSign } from "lucide-react";
 import { restApi } from "@/lib/rest-client";
 import { useResourceList } from "@/hooks/use-resource-list";
 
 export default function IncomesPage() {
+	const getRefId = (value: unknown): string => {
+		if (typeof value === "string") return value;
+		if (value && typeof value === "object") {
+			const record = value as Record<string, unknown>;
+			if (typeof record._id === "string") return record._id;
+		}
+		return "";
+	};
+	const getItemDisplay = (value: unknown): string => {
+		if (typeof value === "string") return value;
+		if (value && typeof value === "object") {
+			const record = value as Record<string, unknown>;
+			const itemName =
+				typeof record.itemName === "string" ? record.itemName : "";
+			const brandName =
+				typeof record.brandName === "string" ? record.brandName : "";
+			const combined = [itemName, brandName].filter(Boolean).join(" · ");
+			if (combined) return combined;
+			if (typeof record._id === "string") return record._id;
+		}
+		return "";
+	};
 	const [search, setSearch] = useState("");
 	const [selectedIncome, setSelectedIncome] = useState<Income | null>(null);
 	const [showForm, setShowForm] = useState(false);
@@ -35,6 +57,8 @@ export default function IncomesPage() {
 	const [formReceivedAt, setFormReceivedAt] = useState<Date | undefined>(
 		undefined,
 	);
+	const [formMonth, setFormMonth] = useState("");
+	const [formPrelaunchBag, setFormPrelaunchBag] = useState("");
 
 	const loadOrders = useCallback(
 		() => restApi.orders.getAll() as Promise<Order[]>,
@@ -46,6 +70,10 @@ export default function IncomesPage() {
 	);
 	const loadSellers = useCallback(
 		() => restApi.sellers.getAll() as Promise<Seller[]>,
+		[],
+	);
+	const loadUsers = useCallback(
+		() => restApi.users.getAll() as Promise<User[]>,
 		[],
 	);
 
@@ -79,11 +107,38 @@ export default function IncomesPage() {
 	const { data: orders } = useResourceList(loadOrders);
 	const { data: items } = useResourceList(loadItems);
 	const { data: sellers } = useResourceList(loadSellers);
+	const { data: users } = useResourceList(loadUsers);
 
 	const safeOrders = Array.isArray(orders) ? orders : [];
 	const safeItems = Array.isArray(items) ? items : [];
 	const safeSellers = Array.isArray(sellers) ? sellers : [];
+	const safeUsers = Array.isArray(users) ? users : [];
 	const safeIncomes = Array.isArray(incomes) ? incomes : [];
+	const userLabelById = useMemo(
+		() =>
+			new Map(
+				safeUsers.map((user) => [
+					user._id,
+					user.emailAddress || user.username || user._id,
+				]),
+			),
+		[safeUsers],
+	);
+	const getSellerUserId = (seller: Seller): string => {
+		const uid = seller.userId as unknown;
+		if (typeof uid === "string") return uid;
+		if (uid && typeof uid === "object" && "_id" in (uid as Record<string, unknown>)) {
+			const candidate = uid as { _id?: string };
+			return candidate._id ?? seller._id;
+		}
+		return seller._id;
+	};
+	const toSellerUserId = (id: string): string => {
+		if (!id) return "";
+		const match = safeSellers.find((seller) => seller._id === id);
+		if (!match) return id;
+		return getSellerUserId(match);
+	};
 	const orderLabelById = useMemo(
 		() =>
 			new Map(
@@ -105,14 +160,17 @@ export default function IncomesPage() {
 		[safeItems],
 	);
 	const sellerLabelById = useMemo(
-		() =>
-			new Map(
-				safeSellers.map((s) => [
-					s._id,
-					s._id.slice(-6) + (s.isDeactivated ? " (inactive)" : ""),
-				]),
-			),
-		[safeSellers],
+		() => {
+			const map = new Map<string, string>();
+			for (const seller of safeSellers) {
+				const sellerUserId = getSellerUserId(seller);
+				const label = userLabelById.get(sellerUserId) ?? sellerUserId ?? seller._id;
+				map.set(seller._id, label);
+				map.set(sellerUserId, label);
+			}
+			return map;
+		},
+		[safeSellers, userLabelById],
 	);
 
 	const columns: Column<Income>[] = [
@@ -126,31 +184,16 @@ export default function IncomesPage() {
 			),
 		},
 		{
-			key: "erlumeCommissionAmount",
-			header: "Erlume commission",
-			render: (inc) => (
-				<span className="text-muted-foreground">
-					KD {Number(inc.erlumeCommissionAmount ?? 0).toFixed(2)}
-				</span>
-			),
-		},
-		{
-			key: "sellerPayoutAmount",
-			header: "Seller payout",
-			render: (inc) => (
-				<span className="text-muted-foreground">
-					KD {Number(inc.sellerPayoutAmount ?? 0).toFixed(2)}
-				</span>
-			),
-		},
-		{
 			key: "order_id",
 			header: "Order",
 			render: (inc) => (
 				<span className="text-sm truncate max-w-[140px] block">
-					{inc.order_id
-						? orderLabelById.get(inc.order_id) ?? inc.order_id
-						: "—"}
+					{(() => {
+						const orderId = getRefId(inc.order_id);
+						return orderId
+							? (orderLabelById.get(orderId) ?? orderId)
+							: "—";
+					})()}
 				</span>
 			),
 		},
@@ -159,7 +202,12 @@ export default function IncomesPage() {
 			header: "Item",
 			render: (inc) => (
 				<span className="text-sm truncate max-w-[140px] block">
-					{inc.item_id ? itemLabelById.get(inc.item_id) ?? inc.item_id : "—"}
+					{(() => {
+						const itemId = getRefId(inc.item_id);
+						if (itemId) return itemLabelById.get(itemId) ?? itemId;
+						const display = getItemDisplay(inc.item_id);
+						return display || "—";
+					})()}
 				</span>
 			),
 		},
@@ -168,9 +216,12 @@ export default function IncomesPage() {
 			header: "Seller",
 			render: (inc) => (
 				<span className="text-sm truncate max-w-[120px] block">
-					{inc.seller_id
-						? sellerLabelById.get(inc.seller_id) ?? inc.seller_id
-						: "—"}
+					{(() => {
+						const sellerId = getRefId(inc.seller_id);
+						return sellerId
+							? (sellerLabelById.get(sellerId) ?? sellerId)
+							: "—";
+					})()}
 				</span>
 			),
 		},
@@ -192,9 +243,11 @@ export default function IncomesPage() {
 		const q = search.toLowerCase();
 		return safeIncomes.filter(
 			(inc) =>
-				(inc.order_id ?? "").toLowerCase().includes(q) ||
-				(inc.item_id ?? "").toLowerCase().includes(q) ||
-				(inc.seller_id ?? "").toLowerCase().includes(q) ||
+				getRefId(inc.order_id).toLowerCase().includes(q) ||
+				(getItemDisplay(inc.item_id).toLowerCase().includes(q) ||
+					getRefId(inc.item_id).toLowerCase().includes(q)) ||
+				getRefId(inc.seller_id).toLowerCase().includes(q) ||
+				(inc.prelaunch_bag ?? "").toLowerCase().includes(q) ||
 				String(inc.amount ?? "").includes(q) ||
 				(inc.notes ?? "").toLowerCase().includes(q),
 		);
@@ -214,16 +267,14 @@ export default function IncomesPage() {
 		setFormError(null);
 		const formData = new FormData(event.currentTarget);
 		const amount = String(formData.get("amount") ?? "").trim();
-		const erlumeCommissionAmount = String(
-			formData.get("erlumeCommissionAmount") ?? "",
-		).trim();
-		const sellerPayoutAmount = String(
-			formData.get("sellerPayoutAmount") ?? "",
-		).trim();
 		const order_id = formOrderId || undefined;
 		const item_id = formItemId || undefined;
-		const seller_id = formSellerId || undefined;
+		const seller_id = formSellerId ? toSellerUserId(formSellerId) : undefined;
 		const notes = String(formData.get("notes") ?? "").trim();
+		const month =
+			formMonth.trim() !== ""
+				? new Date(`${formMonth}-01`).toISOString()
+				: undefined;
 		const received_at = formReceivedAt
 			? formReceivedAt.toISOString()
 			: new Date().toISOString();
@@ -239,35 +290,39 @@ export default function IncomesPage() {
 			platform: "backoffice",
 			income_type: "sale",
 			received_at,
-			...(erlumeCommissionAmount && {
-				erlumeCommissionAmount,
-			}),
-			...(sellerPayoutAmount && { sellerPayoutAmount }),
 			...(order_id && { order_id }),
 			...(item_id && { item_id }),
 			...(seller_id && { seller_id }),
+			...(formPrelaunchBag.trim() && { prelaunch_bag: formPrelaunchBag.trim() }),
+			...(month && { month }),
 			...(notes && { notes }),
 		};
 
 		try {
-			if (editingIncome) {
-				await restApi.incomes.update(
-					editingIncome._id,
-					payload as Partial<Income>,
+			const editId = editingIncome?._id?.trim();
+			if (editingIncome && !editId) {
+				setFormError("Cannot update income: missing income id.");
+				return;
+			}
+			if (editId) {
+				await restApi.incomesExtra.update(
+					editId,
+					payload as Record<string, unknown>,
 				);
 			} else {
-				await restApi.incomes.create(
-					payload as Omit<Income, "_id" | "createdAt" | "updatedAt">,
+				await restApi.incomesExtra.create(
+					payload as Record<string, unknown>,
 				);
 			}
 			await reload();
 			setShowForm(false);
 			setEditingIncome(null);
 		} catch (err) {
-			const message =
-				err instanceof Error ? err.message : "Failed to save income";
+			const message = err instanceof Error ? err.message : "Failed to save income";
+			const mode = editingIncome ? "update" : "create";
+			const idInfo = editingIncome?._id ? ` (id: ${editingIncome._id})` : "";
 			setFormError(message);
-			console.error("Failed to save income", err);
+			console.error(`Failed to ${mode} income${idInfo}`, err);
 		}
 	};
 
@@ -275,7 +330,7 @@ export default function IncomesPage() {
 		<AdminLayout>
 			<PageHeader
 				title="Incomes"
-				description="Commission breakdown: Erlume commission, income amount, seller payout per sale/item"
+				description="Erlume bank receipts only (amount = money received by Erlume)"
 				searchValue={search}
 				onSearchChange={setSearch}
 				searchPlaceholder="Search by order, item, seller, amount..."
@@ -285,6 +340,8 @@ export default function IncomesPage() {
 					setFormItemId("");
 					setFormSellerId("");
 					setFormReceivedAt(undefined);
+					setFormMonth("");
+					setFormPrelaunchBag("");
 					setShowForm(true);
 					setFormError(null);
 				}}
@@ -339,7 +396,7 @@ export default function IncomesPage() {
 							options: [
 								{ value: "", label: "All sellers" },
 								...safeSellers.map((s) => ({
-									value: s._id,
+									value: getSellerUserId(s),
 									label: sellerLabelById.get(s._id) ?? s._id,
 								})),
 							],
@@ -355,9 +412,13 @@ export default function IncomesPage() {
 					onView={(inc) => setSelectedIncome(inc)}
 					onEdit={(inc) => {
 						setEditingIncome(inc);
-						setFormOrderId(inc.order_id ?? "");
-						setFormItemId(inc.item_id ?? "");
-						setFormSellerId(inc.seller_id ?? "");
+						setFormOrderId(getRefId(inc.order_id));
+						setFormItemId(getRefId(inc.item_id));
+						setFormSellerId(getRefId(inc.seller_id));
+						setFormMonth(
+							inc.month ? new Date(inc.month).toISOString().slice(0, 7) : "",
+						);
+						setFormPrelaunchBag(inc.prelaunch_bag ?? "");
 						setFormReceivedAt(
 							inc.received_at ? new Date(inc.received_at) : undefined,
 						);
@@ -384,33 +445,21 @@ export default function IncomesPage() {
 									KD {Number(selectedIncome.amount ?? 0).toFixed(2)}
 								</p>
 								<p className="text-sm text-muted-foreground">
-									Commission breakdown
+									Money received by Erlume
 								</p>
 							</div>
 						</div>
 						<div className="grid grid-cols-2 gap-3">
-							<div className="p-3 bg-muted/30 rounded-lg">
-								<p className="text-xs text-muted-foreground">
-									Erlume commission
-								</p>
-								<p className="font-medium">
-									KD {Number(selectedIncome.erlumeCommissionAmount ?? 0).toFixed(
-										2,
-									)}
-								</p>
-							</div>
-							<div className="p-3 bg-muted/30 rounded-lg">
-								<p className="text-xs text-muted-foreground">Seller payout</p>
-								<p className="font-medium">
-									KD {Number(selectedIncome.sellerPayoutAmount ?? 0).toFixed(2)}
-								</p>
-							</div>
 							<div className="p-3 bg-muted/30 rounded-lg col-span-2">
 								<p className="text-xs text-muted-foreground">Order</p>
 								<p className="text-sm truncate">
 									{selectedIncome.order_id
-										? orderLabelById.get(selectedIncome.order_id) ??
-										  selectedIncome.order_id
+										? (() => {
+												const orderId = getRefId(selectedIncome.order_id);
+												return orderId
+													? (orderLabelById.get(orderId) ?? orderId)
+													: "—";
+											})()
 										: "—"}
 								</p>
 							</div>
@@ -418,8 +467,28 @@ export default function IncomesPage() {
 								<p className="text-xs text-muted-foreground">Item</p>
 								<p className="text-sm truncate">
 									{selectedIncome.item_id
-										? itemLabelById.get(selectedIncome.item_id) ??
-										  selectedIncome.item_id
+										? (() => {
+												const itemId = getRefId(selectedIncome.item_id);
+												if (itemId) return itemLabelById.get(itemId) ?? itemId;
+												return getItemDisplay(selectedIncome.item_id) || "—";
+											})()
+										: "—"}
+								</p>
+							</div>
+							<div className="p-3 bg-muted/30 rounded-lg col-span-2">
+								<p className="text-xs text-muted-foreground">Prelaunch bag</p>
+								<p className="text-sm">
+									{selectedIncome.prelaunch_bag || "—"}
+								</p>
+							</div>
+							<div className="p-3 bg-muted/30 rounded-lg col-span-2">
+								<p className="text-xs text-muted-foreground">Month</p>
+								<p className="text-sm">
+									{selectedIncome.month
+										? new Date(selectedIncome.month).toLocaleDateString("en-US", {
+												month: "short",
+												year: "numeric",
+											})
 										: "—"}
 								</p>
 							</div>
@@ -427,8 +496,12 @@ export default function IncomesPage() {
 								<p className="text-xs text-muted-foreground">Seller</p>
 								<p className="text-sm truncate">
 									{selectedIncome.seller_id
-										? sellerLabelById.get(selectedIncome.seller_id) ??
-										  selectedIncome.seller_id
+										? (() => {
+												const sellerId = getRefId(selectedIncome.seller_id);
+												return sellerId
+													? (sellerLabelById.get(sellerId) ?? sellerId)
+													: "—";
+											})()
 										: "—"}
 								</p>
 							</div>
@@ -452,6 +525,15 @@ export default function IncomesPage() {
 							className="w-full"
 							onClick={() => {
 								setEditingIncome(selectedIncome);
+								setFormOrderId(getRefId(selectedIncome.order_id));
+								setFormItemId(getRefId(selectedIncome.item_id));
+								setFormSellerId(getRefId(selectedIncome.seller_id));
+								setFormMonth(
+									selectedIncome.month
+										? new Date(selectedIncome.month).toISOString().slice(0, 7)
+										: "",
+								);
+								setFormPrelaunchBag(selectedIncome.prelaunch_bag ?? "");
 								setFormReceivedAt(
 									selectedIncome.received_at
 										? new Date(selectedIncome.received_at)
@@ -472,6 +554,8 @@ export default function IncomesPage() {
 					setShowForm(false);
 					setEditingIncome(null);
 					setFormReceivedAt(undefined);
+					setFormMonth("");
+					setFormPrelaunchBag("");
 					setFormError(null);
 				}}
 				title={editingIncome ? "Edit income" : "Add income"}
@@ -494,31 +578,9 @@ export default function IncomesPage() {
 						/>
 					</div>
 					<div className="space-y-2">
-						<Label htmlFor="erlumeCommissionAmount">Erlume commission</Label>
-						<Input
-							id="erlumeCommissionAmount"
-							name="erlumeCommissionAmount"
-							type="text"
-							inputMode="decimal"
-							defaultValue={editingIncome?.erlumeCommissionAmount ?? ""}
-							placeholder="Amount"
-						/>
-					</div>
-					<div className="space-y-2">
-						<Label htmlFor="sellerPayoutAmount">Seller payout</Label>
-						<Input
-							id="sellerPayoutAmount"
-							name="sellerPayoutAmount"
-							type="text"
-							inputMode="decimal"
-							defaultValue={editingIncome?.sellerPayoutAmount ?? ""}
-							placeholder="Amount"
-						/>
-					</div>
-					<div className="space-y-2">
 						<Label>Order</Label>
 						<Select
-							value={(editingIncome?.order_id ?? formOrderId) || "__none__"}
+							value={formOrderId || "__none__"}
 							onValueChange={(v) => setFormOrderId(v === "__none__" ? "" : v)}>
 							<SelectTrigger>
 								<SelectValue placeholder="Select order" />
@@ -536,7 +598,7 @@ export default function IncomesPage() {
 					<div className="space-y-2">
 						<Label>Item</Label>
 						<Select
-							value={(editingIncome?.item_id ?? formItemId) || "__none__"}
+							value={formItemId || "__none__"}
 							onValueChange={(v) => setFormItemId(v === "__none__" ? "" : v)}>
 							<SelectTrigger>
 								<SelectValue placeholder="Select item" />
@@ -554,7 +616,7 @@ export default function IncomesPage() {
 					<div className="space-y-2">
 						<Label>Seller</Label>
 						<Select
-							value={(editingIncome?.seller_id ?? formSellerId) || "__none__"}
+							value={formSellerId || "__none__"}
 							onValueChange={(v) => setFormSellerId(v === "__none__" ? "" : v)}>
 							<SelectTrigger>
 								<SelectValue placeholder="Select seller" />
@@ -562,12 +624,32 @@ export default function IncomesPage() {
 							<SelectContent>
 								<SelectItem value="__none__">None</SelectItem>
 								{safeSellers.map((s) => (
-									<SelectItem key={s._id} value={s._id}>
+									<SelectItem key={s._id} value={getSellerUserId(s)}>
 										{sellerLabelById.get(s._id) ?? s._id}
 									</SelectItem>
 								))}
 							</SelectContent>
 						</Select>
+					</div>
+					<div className="space-y-2">
+						<Label htmlFor="prelaunch_bag">Prelaunch bag</Label>
+						<Input
+							id="prelaunch_bag"
+							name="prelaunch_bag"
+							value={formPrelaunchBag}
+							onChange={(e) => setFormPrelaunchBag(e.target.value)}
+							placeholder="Name-Brand-Year"
+						/>
+					</div>
+					<div className="space-y-2">
+						<Label htmlFor="month">Month</Label>
+						<Input
+							id="month"
+							name="month"
+							type="month"
+							value={formMonth}
+							onChange={(e) => setFormMonth(e.target.value)}
+						/>
 					</div>
 					<div className="space-y-2">
 						<Label>Received at</Label>

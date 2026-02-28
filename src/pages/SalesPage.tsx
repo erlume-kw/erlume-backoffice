@@ -14,12 +14,44 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import type { Order, OrderItem, Sale, Transaction } from "@/types/models";
+import type { Item, Order, OrderItem, Sale, Transaction } from "@/types/models";
 import { FileText } from "lucide-react";
 import { restApi } from "@/lib/rest-client";
 import { useResourceList } from "@/hooks/use-resource-list";
 
 export default function SalesPage() {
+	const getRefId = (value: unknown): string => {
+		if (typeof value === "string") return value;
+		if (value && typeof value === "object") {
+			const record = value as Record<string, unknown>;
+			if (typeof record._id === "string") return record._id;
+		}
+		return "";
+	};
+	const getCommissionValue = (sale: Sale): string => {
+		const candidate = sale as Sale & {
+			erlumeCommissionAmount?: string;
+			erlume_commission?: string;
+		};
+		return (
+			sale.erlumeCommission ??
+			candidate.erlumeCommissionAmount ??
+			candidate.erlume_commission ??
+			""
+		);
+	};
+	const getSellerPayoutValue = (sale: Sale): string => {
+		const candidate = sale as Sale & {
+			sellerPayoutAmount?: string;
+			seller_payout?: string;
+		};
+		return (
+			sale.sellerPayout ??
+			candidate.sellerPayoutAmount ??
+			candidate.seller_payout ??
+			""
+		);
+	};
 	const [search, setSearch] = useState("");
 	const [filters, setFilters] = useState<Record<string, string | undefined>>(
 		{},
@@ -30,6 +62,16 @@ export default function SalesPage() {
 	const [formOrderId, setFormOrderId] = useState("");
 	const [formOrderItemId, setFormOrderItemId] = useState("");
 	const [formTransactionId, setFormTransactionId] = useState("");
+	const [formItemId, setFormItemId] = useState("");
+	const [formFlow, setFormFlow] = useState<"order" | "prelaunch">("order");
+	const [formAmount, setFormAmount] = useState("");
+	const [formListingPrice, setFormListingPrice] = useState("");
+	const [formErlumeCommission, setFormErlumeCommission] = useState("");
+	const [formSellerPayout, setFormSellerPayout] = useState("");
+	const [formBuyer, setFormBuyer] = useState("");
+	const [formSaleStatus, setFormSaleStatus] = useState("");
+	const [formSaleDate, setFormSaleDate] = useState("");
+	const [formBagRecord, setFormBagRecord] = useState("");
 	const [formError, setFormError] = useState<string | null>(null);
 
 	const loadSales = useCallback(() => {
@@ -50,6 +92,10 @@ export default function SalesPage() {
 		() => restApi.transactions.getAll() as Promise<Transaction[]>,
 		[],
 	);
+	const loadItems = useCallback(
+		() => restApi.items.getAll() as Promise<Item[]>,
+		[],
+	);
 
 	const {
 		data: salesData,
@@ -60,6 +106,7 @@ export default function SalesPage() {
 	const { data: ordersData } = useResourceList(loadOrders);
 	const { data: orderItemsData } = useResourceList(loadOrderItems);
 	const { data: transactionsData } = useResourceList(loadTransactions);
+	const { data: itemsData } = useResourceList(loadItems);
 
 	const safeSales = Array.isArray(salesData) ? salesData : [];
 	const safeOrders = Array.isArray(ordersData) ? ordersData : [];
@@ -67,6 +114,7 @@ export default function SalesPage() {
 	const safeTransactions = Array.isArray(transactionsData)
 		? transactionsData
 		: [];
+	const safeItems = Array.isArray(itemsData) ? itemsData : [];
 
 	const orderLabelById = useMemo(
 		() =>
@@ -98,6 +146,68 @@ export default function SalesPage() {
 			),
 		[safeTransactions],
 	);
+	const itemLabelById = useMemo(
+		() =>
+			new Map(
+				safeItems.map((i) => [
+					i._id,
+					[i.itemName, i.brandName].filter(Boolean).join(" · ") || i._id,
+				]),
+			),
+		[safeItems],
+	);
+	const itemById = useMemo(
+		() => new Map(safeItems.map((item) => [item._id, item])),
+		[safeItems],
+	);
+	const orderItemById = useMemo(
+		() => new Map(safeOrderItems.map((oi) => [oi._id, oi])),
+		[safeOrderItems],
+	);
+	const getNormalizedRate = (rawRate: string): number | null => {
+		const parsed = Number(rawRate);
+		if (!Number.isFinite(parsed) || parsed < 0) return null;
+		return parsed > 1 ? parsed / 100 : parsed;
+	};
+	const getSaleLinkedItemId = (sale: Sale): string => {
+		const direct = getRefId(sale.item_id);
+		if (direct) return direct;
+		const orderItemId = getRefId(sale.order_item_id);
+		if (!orderItemId) return "";
+		const orderItem = orderItemById.get(orderItemId);
+		if (!orderItem) return "";
+		return getRefId(orderItem.item_id);
+	};
+	const computeCommissionFromSaleRate = (sale: Sale): string => {
+		const amount = Number(sale.amount ?? "");
+		if (!Number.isFinite(amount) || amount < 0) return "";
+		const itemId = getSaleLinkedItemId(sale);
+		if (!itemId) return "";
+		const item = itemById.get(itemId);
+		if (!item || !item.saleRate) return "";
+		const rate = getNormalizedRate(String(item.saleRate));
+		if (rate == null) return "";
+		return (amount * rate).toFixed(2);
+	};
+	const computeSellerPayoutFromSaleRate = (sale: Sale): string => {
+		const amount = Number(sale.amount ?? "");
+		if (!Number.isFinite(amount) || amount < 0) return "";
+		const itemId = getSaleLinkedItemId(sale);
+		if (!itemId) return "";
+		const item = itemById.get(itemId);
+		if (!item || !item.saleRate) return "";
+		const rate = getNormalizedRate(String(item.saleRate));
+		if (rate == null) return "";
+		return (amount * (1 - rate)).toFixed(2);
+	};
+	const getDisplayCommission = (sale: Sale): string => {
+		const explicit = getCommissionValue(sale);
+		return explicit || computeCommissionFromSaleRate(sale);
+	};
+	const getDisplaySellerPayout = (sale: Sale): string => {
+		const explicit = getSellerPayoutValue(sale);
+		return explicit || computeSellerPayoutFromSaleRate(sale);
+	};
 
 	const orderItemsByOrder = useMemo(() => {
 		const map = new Map<string, OrderItem[]>();
@@ -115,7 +225,7 @@ export default function SalesPage() {
 			header: "Order",
 			render: (s) => (
 				<span className="text-sm">
-					{orderLabelById.get(s.order_id) ?? s.order_id}
+					{s.order_id ? orderLabelById.get(s.order_id) ?? s.order_id : "—"}
 				</span>
 			),
 		},
@@ -124,7 +234,9 @@ export default function SalesPage() {
 			header: "Order item",
 			render: (s) => (
 				<span className="text-sm">
-					{orderItemLabelById.get(s.order_item_id) ?? s.order_item_id}
+					{s.order_item_id
+						? orderItemLabelById.get(s.order_item_id) ?? s.order_item_id
+						: "—"}
 				</span>
 			),
 		},
@@ -146,6 +258,37 @@ export default function SalesPage() {
 				<span className="text-muted-foreground">{s.invoice_number ?? "—"}</span>
 			),
 		},
+		{
+			key: "amount",
+			header: "Total",
+			render: (s) => (
+				<span className="text-muted-foreground">
+					{s.amount ? `KD ${Number(s.amount).toFixed(2)}` : "—"}
+				</span>
+			),
+		},
+		{
+			key: "erlumeCommission",
+			header: "Erlume",
+			render: (s) => (
+				<span className="text-muted-foreground">
+					{getDisplayCommission(s)
+						? `KD ${Number(getDisplayCommission(s)).toFixed(2)}`
+						: "—"}
+				</span>
+			),
+		},
+		{
+			key: "sellerPayout",
+			header: "Seller",
+			render: (s) => (
+				<span className="text-muted-foreground">
+					{getDisplaySellerPayout(s)
+						? `KD ${Number(getDisplaySellerPayout(s)).toFixed(2)}`
+						: "—"}
+				</span>
+			),
+		},
 	];
 
 	const filteredSales = useMemo(() => {
@@ -154,7 +297,9 @@ export default function SalesPage() {
 		return safeSales.filter(
 			(s) =>
 				(s.order_id ?? "").toLowerCase().includes(q) ||
-				(s.invoice_number ?? "").toLowerCase().includes(q),
+				(s.invoice_number ?? "").toLowerCase().includes(q) ||
+				(s.buyer ?? "").toLowerCase().includes(q) ||
+				(s.bag_record ?? "").toLowerCase().includes(q),
 		);
 	}, [safeSales, search]);
 
@@ -175,28 +320,57 @@ export default function SalesPage() {
 		event.preventDefault();
 		setFormError(null);
 		const formData = new FormData(event.currentTarget);
-		const order_id = editingSale?.order_id ?? formOrderId;
-		const order_item_id = editingSale?.order_item_id ?? formOrderItemId;
+		const order_id = formOrderId || undefined;
+		const order_item_id = formOrderItemId || undefined;
 		const transaction_id = formTransactionId || undefined;
 		const invoice_number = String(formData.get("invoice_number") ?? "").trim();
 		const invoice_url = String(formData.get("invoice_url") ?? "").trim();
 		const payment_evidence_url = String(
 			formData.get("payment_evidence_url") ?? "",
 		).trim();
+		const amount = formAmount.trim() || undefined;
+		const listingPrice = formListingPrice.trim() || undefined;
+		const erlumeCommission = formErlumeCommission.trim() || undefined;
+		const sellerPayout = formSellerPayout.trim() || undefined;
+		const buyer = formBuyer.trim() || undefined;
+		const status = formSaleStatus.trim() || undefined;
+		const bag_record = formBagRecord.trim() || undefined;
+		const sale_date = formSaleDate
+			? new Date(formSaleDate).toISOString()
+			: undefined;
+		const item_id = formItemId || undefined;
 
-		if (!order_id || !order_item_id) {
-			setFormError("Order and order item are required.");
+		if (formFlow === "order" && (!order_id || !order_item_id)) {
+			setFormError("Order and order item are required for order flow.");
+			return;
+		}
+		if (formFlow === "prelaunch" && !amount && !bag_record) {
+			setFormError(
+				"For prelaunch flow, provide at least amount or bag record.",
+			);
 			return;
 		}
 
 		try {
 			const payload: Partial<Sale> = {
-				order_id,
-				order_item_id,
-				invoice_number: invoice_number || "",
-				invoice_url: invoice_url || "",
-				payment_evidence_url: payment_evidence_url || "",
+				...(formFlow === "order" && order_id && { order_id }),
+				...(formFlow === "order" && order_item_id && { order_item_id }),
+				...(invoice_number && { invoice_number }),
+				...(invoice_url && { invoice_url }),
+				...(payment_evidence_url && { payment_evidence_url }),
 				...(transaction_id && { transaction_id }),
+				...(item_id && { item_id }),
+				...(amount && { amount }),
+				...(listingPrice && { listingPrice }),
+				...(erlumeCommission && { erlumeCommission }),
+				...(sellerPayout && { sellerPayout }),
+				// Keep aliases for backend compatibility during rollout.
+				...(erlumeCommission && { erlumeCommissionAmount: erlumeCommission }),
+				...(sellerPayout && { sellerPayoutAmount: sellerPayout }),
+				...(buyer && { buyer }),
+				...(status && { status }),
+				...(sale_date && { sale_date }),
+				...(bag_record && { bag_record }),
 			};
 			if (editingSale) {
 				await restApi.sales.update(editingSale._id, payload);
@@ -211,6 +385,16 @@ export default function SalesPage() {
 			setFormOrderId("");
 			setFormOrderItemId("");
 			setFormTransactionId("");
+			setFormItemId("");
+			setFormAmount("");
+			setFormListingPrice("");
+			setFormErlumeCommission("");
+			setFormSellerPayout("");
+			setFormBuyer("");
+			setFormSaleStatus("");
+			setFormSaleDate("");
+			setFormBagRecord("");
+			setFormFlow("order");
 		} catch (err) {
 			setFormError(err instanceof Error ? err.message : "Failed to save sale");
 			console.error("Failed to save sale", err);
@@ -225,15 +409,25 @@ export default function SalesPage() {
 		<AdminLayout>
 			<PageHeader
 				title="Sales"
-				description="Sales records (invoice, evidence) linked to orders and order items"
+				description="Sale breakdown source of truth: total, Erlume commission, and seller payout"
 				searchValue={search}
 				onSearchChange={setSearch}
 				searchPlaceholder="Search sales..."
 				onAdd={() => {
 					setEditingSale(null);
+					setFormFlow("order");
 					setFormOrderId("");
 					setFormOrderItemId("");
 					setFormTransactionId("");
+					setFormItemId("");
+					setFormAmount("");
+					setFormListingPrice("");
+					setFormErlumeCommission("");
+					setFormSellerPayout("");
+					setFormBuyer("");
+					setFormSaleStatus("");
+					setFormSaleDate("");
+					setFormBagRecord("");
 					setFormError(null);
 					setShowForm(true);
 				}}
@@ -271,9 +465,21 @@ export default function SalesPage() {
 					onView={(s) => setSelectedSale(s)}
 					onEdit={(s) => {
 						setEditingSale(s);
-						setFormOrderId(s.order_id);
-						setFormOrderItemId(s.order_item_id);
+						setFormFlow(s.order_id && s.order_item_id ? "order" : "prelaunch");
+						setFormOrderId(s.order_id ?? "");
+						setFormOrderItemId(s.order_item_id ?? "");
 						setFormTransactionId(s.transaction_id ?? "");
+						setFormItemId(s.item_id ?? "");
+						setFormAmount(s.amount ?? "");
+						setFormListingPrice(s.listingPrice ?? "");
+						setFormErlumeCommission(getDisplayCommission(s));
+						setFormSellerPayout(getDisplaySellerPayout(s));
+						setFormBuyer(s.buyer ?? "");
+						setFormSaleStatus(s.status ?? "");
+						setFormSaleDate(
+							s.sale_date ? new Date(s.sale_date).toISOString().slice(0, 10) : "",
+						);
+						setFormBagRecord(s.bag_record ?? "");
 						setFormError(null);
 						setShowForm(true);
 					}}
@@ -302,15 +508,61 @@ export default function SalesPage() {
 							<div className="p-3 bg-muted/30 rounded-lg col-span-2">
 								<p className="text-xs text-muted-foreground">Order</p>
 								<p className="text-sm">
-									{orderLabelById.get(selectedSale.order_id) ??
-										selectedSale.order_id}
+									{selectedSale.order_id
+										? (orderLabelById.get(selectedSale.order_id) ??
+											selectedSale.order_id)
+										: "—"}
 								</p>
 							</div>
 							<div className="p-3 bg-muted/30 rounded-lg col-span-2">
 								<p className="text-xs text-muted-foreground">Order item</p>
 								<p className="text-sm">
-									{orderItemLabelById.get(selectedSale.order_item_id) ??
-										selectedSale.order_item_id}
+									{selectedSale.order_item_id
+										? (orderItemLabelById.get(selectedSale.order_item_id) ??
+											selectedSale.order_item_id)
+										: "—"}
+								</p>
+							</div>
+							<div className="p-3 bg-muted/30 rounded-lg col-span-2">
+								<p className="text-xs text-muted-foreground">Prelaunch bag</p>
+								<p className="text-sm">{selectedSale.bag_record || "—"}</p>
+							</div>
+							<div className="p-3 bg-muted/30 rounded-lg col-span-2">
+								<p className="text-xs text-muted-foreground">Buyer</p>
+								<p className="text-sm">{selectedSale.buyer || "—"}</p>
+							</div>
+							<div className="p-3 bg-muted/30 rounded-lg">
+								<p className="text-xs text-muted-foreground">Total</p>
+								<p className="text-sm">
+									{selectedSale.amount
+										? `KD ${Number(selectedSale.amount).toFixed(2)}`
+										: "—"}
+								</p>
+							</div>
+							<div className="p-3 bg-muted/30 rounded-lg">
+								<p className="text-xs text-muted-foreground">Erlume commission</p>
+								<p className="text-sm">
+									{selectedSale.erlumeCommission
+										? `KD ${Number(
+												selectedSale.erlumeCommission,
+											).toFixed(2)}`
+										: getDisplayCommission(selectedSale)
+											? `KD ${Number(
+													getDisplayCommission(selectedSale),
+												).toFixed(2)}`
+										: "—"}
+								</p>
+							</div>
+							<div className="p-3 bg-muted/30 rounded-lg col-span-2">
+								<p className="text-xs text-muted-foreground">Seller payout</p>
+								<p className="text-sm">
+									{selectedSale.sellerPayout
+										? `KD ${Number(selectedSale.sellerPayout).toFixed(2)}`
+										: getDisplaySellerPayout(selectedSale)
+											? `KD ${Number(
+													getDisplaySellerPayout(selectedSale),
+												).toFixed(2)}`
+										: "—"}
 								</p>
 							</div>
 							<div className="p-3 bg-muted/30 rounded-lg col-span-2">
@@ -336,9 +588,27 @@ export default function SalesPage() {
 							className="w-full"
 							onClick={() => {
 								setEditingSale(selectedSale);
-								setFormOrderId(selectedSale.order_id);
-								setFormOrderItemId(selectedSale.order_item_id);
+								setFormFlow(
+									selectedSale.order_id && selectedSale.order_item_id
+										? "order"
+										: "prelaunch",
+								);
+								setFormOrderId(selectedSale.order_id ?? "");
+								setFormOrderItemId(selectedSale.order_item_id ?? "");
 								setFormTransactionId(selectedSale.transaction_id ?? "");
+								setFormItemId(selectedSale.item_id ?? "");
+								setFormAmount(selectedSale.amount ?? "");
+								setFormListingPrice(selectedSale.listingPrice ?? "");
+								setFormErlumeCommission(getDisplayCommission(selectedSale));
+								setFormSellerPayout(getDisplaySellerPayout(selectedSale));
+								setFormBuyer(selectedSale.buyer ?? "");
+								setFormSaleStatus(selectedSale.status ?? "");
+								setFormSaleDate(
+									selectedSale.sale_date
+										? new Date(selectedSale.sale_date).toISOString().slice(0, 10)
+										: "",
+								);
+								setFormBagRecord(selectedSale.bag_record ?? "");
 								setSelectedSale(null);
 								setShowForm(true);
 							}}>
@@ -356,6 +626,16 @@ export default function SalesPage() {
 					setFormOrderId("");
 					setFormOrderItemId("");
 					setFormTransactionId("");
+					setFormItemId("");
+					setFormAmount("");
+					setFormListingPrice("");
+					setFormErlumeCommission("");
+					setFormSellerPayout("");
+					setFormBuyer("");
+					setFormSaleStatus("");
+					setFormSaleDate("");
+					setFormBagRecord("");
+					setFormFlow("order");
 					setFormError(null);
 				}}
 				title={editingSale ? "Edit sale" : "Add sale"}
@@ -366,56 +646,183 @@ export default function SalesPage() {
 						<div className="text-sm text-destructive">{formError}</div>
 					)}
 					<div className="space-y-2">
-						<Label>Order *</Label>
+						<Label>Flow</Label>
 						<Select
-							value={(editingSale?.order_id ?? formOrderId) || "__none__"}
+							value={formFlow}
 							onValueChange={(v) => {
-								setFormOrderId(v === "__none__" ? "" : v);
-								setFormOrderItemId("");
-							}}
-							disabled={!!editingSale}>
+								const next = v === "prelaunch" ? "prelaunch" : "order";
+								setFormFlow(next);
+								if (next === "prelaunch") {
+									setFormOrderId("");
+									setFormOrderItemId("");
+								}
+							}}>
 							<SelectTrigger>
-								<SelectValue placeholder="Select order" />
+								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>
-								<SelectItem value="__none__">Select order</SelectItem>
-								{safeOrders.map((o) => (
-									<SelectItem key={o._id} value={o._id}>
-										{orderLabelById.get(o._id) ?? o._id}
-									</SelectItem>
-								))}
+								<SelectItem value="order">Order flow</SelectItem>
+								<SelectItem value="prelaunch">Prelaunch flow</SelectItem>
 							</SelectContent>
 						</Select>
 					</div>
+					{formFlow === "order" && (
+						<>
+							<div className="space-y-2">
+								<Label>Order *</Label>
+								<Select
+									value={formOrderId || "__none__"}
+									onValueChange={(v) => {
+										setFormOrderId(v === "__none__" ? "" : v);
+										setFormOrderItemId("");
+									}}>
+									<SelectTrigger>
+										<SelectValue placeholder="Select order" />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="__none__">Select order</SelectItem>
+										{safeOrders.map((o) => (
+											<SelectItem key={o._id} value={o._id}>
+												{orderLabelById.get(o._id) ?? o._id}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+							</div>
+							<div className="space-y-2">
+								<Label>Order item *</Label>
+								<Select
+									value={formOrderItemId || "__none__"}
+									onValueChange={(v) =>
+										setFormOrderItemId(v === "__none__" ? "" : v)
+									}>
+									<SelectTrigger>
+										<SelectValue placeholder="Select order item" />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="__none__">Select order item</SelectItem>
+										{availableOrderItems.map((oi) => (
+											<SelectItem key={oi._id} value={oi._id}>
+												{orderItemLabelById.get(oi._id) ?? oi._id}
+											</SelectItem>
+										))}
+										{formOrderId && availableOrderItems.length === 0 && (
+											<SelectItem value="__empty__" disabled>
+												No order items for this order
+											</SelectItem>
+										)}
+									</SelectContent>
+								</Select>
+							</div>
+						</>
+					)}
+					{formFlow === "prelaunch" && (
+						<>
+							<div className="space-y-2">
+								<Label htmlFor="bag_record">Bag record</Label>
+								<Input
+									id="bag_record"
+									value={formBagRecord}
+									onChange={(e) => setFormBagRecord(e.target.value)}
+									placeholder="Name-Brand-Year"
+								/>
+							</div>
+							<div className="space-y-2">
+								<Label htmlFor="buyer">Buyer</Label>
+								<Input
+									id="buyer"
+									value={formBuyer}
+									onChange={(e) => setFormBuyer(e.target.value)}
+									placeholder="Buyer name"
+								/>
+							</div>
+							<div className="space-y-2">
+								<Label>Item</Label>
+								<Select
+									value={formItemId || "__none__"}
+									onValueChange={(v) =>
+										setFormItemId(v === "__none__" ? "" : v)
+									}>
+									<SelectTrigger>
+										<SelectValue placeholder="Optional item link" />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="__none__">None</SelectItem>
+										{safeItems.map((item) => (
+											<SelectItem key={item._id} value={item._id}>
+												{itemLabelById.get(item._id) ?? item._id}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+							</div>
+							<div className="space-y-2">
+								<Label htmlFor="saleStatus">Status</Label>
+								<Input
+									id="saleStatus"
+									value={formSaleStatus}
+									onChange={(e) => setFormSaleStatus(e.target.value)}
+									placeholder="Optional"
+								/>
+							</div>
+							<div className="space-y-2">
+								<Label htmlFor="saleDate">Sale date</Label>
+								<Input
+									id="saleDate"
+									type="date"
+									value={formSaleDate}
+									onChange={(e) => setFormSaleDate(e.target.value)}
+								/>
+							</div>
+						</>
+					)}
 					<div className="space-y-2">
-						<Label>Order item *</Label>
-						<Select
-							value={
-								(editingSale?.order_item_id ?? formOrderItemId) || "__none__"
-							}
-							onValueChange={(v) =>
-								setFormOrderItemId(v === "__none__" ? "" : v)
-							}
-							disabled={!!editingSale}>
-							<SelectTrigger>
-								<SelectValue placeholder="Select order item" />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value="__none__">Select order item</SelectItem>
-								{availableOrderItems.map((oi) => (
-									<SelectItem key={oi._id} value={oi._id}>
-										{orderItemLabelById.get(oi._id) ?? oi._id}
-									</SelectItem>
-								))}
-								{formOrderId &&
-									availableOrderItems.length === 0 &&
-									!editingSale && (
-										<SelectItem value="__empty__" disabled>
-											No order items for this order
-										</SelectItem>
-									)}
-							</SelectContent>
-						</Select>
+						<Label htmlFor="amount">Total amount</Label>
+						<Input
+							id="amount"
+							type="number"
+							min={0}
+							step="0.01"
+							value={formAmount}
+							onChange={(e) => setFormAmount(e.target.value)}
+							placeholder="Gross total"
+						/>
+					</div>
+					<div className="space-y-2">
+						<Label htmlFor="listingPrice">Listing price</Label>
+						<Input
+							id="listingPrice"
+							type="number"
+							min={0}
+							step="0.01"
+							value={formListingPrice}
+							onChange={(e) => setFormListingPrice(e.target.value)}
+							placeholder="Optional"
+						/>
+					</div>
+					<div className="space-y-2">
+						<Label htmlFor="erlumeCommission">Erlume commission</Label>
+						<Input
+							id="erlumeCommission"
+							type="number"
+							min={0}
+							step="0.01"
+							value={formErlumeCommission}
+							onChange={(e) => setFormErlumeCommission(e.target.value)}
+							placeholder="Optional"
+						/>
+					</div>
+					<div className="space-y-2">
+						<Label htmlFor="sellerPayout">Seller payout</Label>
+						<Input
+							id="sellerPayout"
+							type="number"
+							min={0}
+							step="0.01"
+							value={formSellerPayout}
+							onChange={(e) => setFormSellerPayout(e.target.value)}
+							placeholder="Optional"
+						/>
 					</div>
 					<div className="space-y-2">
 						<Label>Transaction</Label>

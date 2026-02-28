@@ -16,6 +16,7 @@ import {
 	Banknote,
 	FileText,
 	Receipt,
+	Briefcase,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -32,6 +33,7 @@ const navigation = [
 	{ name: "Incomes", href: "/incomes", icon: Banknote },
 	{ name: "Sales", href: "/sales", icon: FileText },
 	{ name: "Expenses", href: "/expenses", icon: Receipt },
+	{ name: "Employees", href: "/employees", icon: Briefcase },
 	{ name: "Categories", href: "/categories", icon: FolderTree },
 	{ name: "Subcategories", href: "/subcategories", icon: Folders },
 	{ name: "Drops", href: "/drops", icon: Zap },

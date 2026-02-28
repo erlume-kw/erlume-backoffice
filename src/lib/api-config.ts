@@ -1,5 +1,6 @@
 // API Configuration
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
+const RAW_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
+export const API_BASE_URL = RAW_API_BASE_URL.replace(/\/+$/, "");
 export const GRAPHQL_ENDPOINT =
 	import.meta.env.VITE_GRAPHQL_ENDPOINT || "/graphql";
 
@@ -37,6 +38,7 @@ export const endpoints = {
 	incomes: `${API_BASE_URL}/incomes`,
 	expenses: `${API_BASE_URL}/expenses`,
 	sales: `${API_BASE_URL}/sales`,
+	employees: `${API_BASE_URL}/employees`,
 	/** GET /api/enums, GET /api/enums/{category} — OpenAPI Enums (orderStatus, itemStatus, bagBrand, kuwaitGovernorate, kuwaitCity, etc.) */
 	enums: `${API_BASE_URL}/enums`,
 } as const;

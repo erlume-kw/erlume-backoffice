@@ -1,5 +1,13 @@
 import { endpoints } from "./api-config";
-import type { CreditCard, Order, Sale, Transaction } from "@/types/models";
+import type {
+	CreditCard,
+	Employee,
+	Expense,
+	Income,
+	Order,
+	Sale,
+	Transaction,
+} from "@/types/models";
 
 // Orders: spec only has PATCH for /api/orders/{id}, no PUT. Use ordersExtra.patch for updates.
 
@@ -129,9 +137,27 @@ export const restApi = {
 	discountcodes: createCrudApi(endpoints.discountcodes),
 	outfits: createCrudApi(endpoints.outfits),
 	outfititems: createCrudApi(endpoints.outfititems),
-	incomes: createCrudApi(endpoints.incomes),
-	expenses: createCrudApi(endpoints.expenses),
+	incomes: createCrudApi<Income>(endpoints.incomes),
+	incomesExtra: {
+		create: (data: Record<string, unknown>) =>
+			apiRequest<Income>(endpoints.incomes, {
+				method: "POST",
+				body: JSON.stringify(data),
+			}),
+		update: (id: string, data: Record<string, unknown>) =>
+			apiRequest<Income>(`${endpoints.incomes}/${id}`, {
+				method: "PUT",
+				body: JSON.stringify(data),
+			}),
+		patch: (id: string, data: Record<string, unknown>) =>
+			apiRequest<Income>(`${endpoints.incomes}/${id}`, {
+				method: "PATCH",
+				body: JSON.stringify(data),
+			}),
+	},
+	expenses: createCrudApi<Expense>(endpoints.expenses),
 	sales: createCrudApi<Sale>(endpoints.sales),
+	employees: createCrudApi<Employee>(endpoints.employees),
 	salesExtra: {
 		getByOrderId: (orderId: string) =>
 			apiRequest<Sale[]>(`${endpoints.sales}/order/${orderId}`),

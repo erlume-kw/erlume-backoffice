@@ -159,12 +159,14 @@ export interface Income {
 	item_id?: string;
 	seller_id?: string;
 	amount: string;
+	month?: string;
+	prelaunch_bag?: string;
 	erlumeCommissionAmount?: string;
 	sellerPayoutAmount?: string;
-	currency: string;
-	platform: string;
-	income_type: string;
-	received_at: string;
+	currency?: string;
+	platform?: string;
+	income_type?: string;
+	received_at?: string;
 	notes?: string;
 	createdAt?: string;
 	updatedAt?: string;
@@ -184,12 +186,21 @@ export interface Transaction {
 
 export interface Sale {
 	_id: string;
-	order_id: string;
-	order_item_id: string;
+	order_id?: string;
+	order_item_id?: string;
+	item_id?: string;
 	transaction_id?: string;
-	invoice_number: string;
-	invoice_url: string;
-	payment_evidence_url: string;
+	amount?: string;
+	listingPrice?: string;
+	erlumeCommission?: string;
+	sellerPayout?: string;
+	buyer?: string;
+	status?: string;
+	sale_date?: string;
+	bag_record?: string;
+	invoice_number?: string;
+	invoice_url?: string;
+	payment_evidence_url?: string;
 	createdAt?: string;
 	updatedAt?: string;
 }
@@ -206,6 +217,19 @@ export interface Expense {
 	paidBy?: string;
 	isRecurring?: boolean;
 	phase?: string;
+	createdAt?: string;
+	updatedAt?: string;
+}
+
+export interface Employee {
+	_id: string;
+	name: string;
+	photo?: string;
+	role?: string;
+	type?: string;
+	salaryActual?: string;
+	salaryProjected?: string;
+	user_id?: string;
 	createdAt?: string;
 	updatedAt?: string;
 }
