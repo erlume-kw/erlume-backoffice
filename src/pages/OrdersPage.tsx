@@ -80,15 +80,16 @@ export default function OrdersPage() {
 			),
 		[users],
 	);
-	const getUserIdValue = (userId: Order["user_id"]) => {
-		if (typeof userId === "string") {
-			return userId;
-		}
-		if (userId && typeof userId === "object") {
-			const candidate = userId as { _id?: string };
+	const getRefId = (value: unknown): string => {
+		if (typeof value === "string") return value;
+		if (value && typeof value === "object") {
+			const candidate = value as { _id?: string };
 			return candidate._id ?? "";
 		}
 		return "";
+	};
+	const getUserIdValue = (userId: Order["user_id"]) => {
+		return getRefId(userId);
 	};
 	const getUserLabel = (userId: Order["user_id"]) => {
 		if (typeof userId === "string") {
@@ -332,9 +333,19 @@ export default function OrdersPage() {
 			setExistingOrderItems([]);
 			return;
 		}
+		const maybePopulated = order.orderitem_ids.filter(
+			(entry) => entry && typeof entry === "object",
+		) as unknown as OrderItem[];
+		if (maybePopulated.length === order.orderitem_ids.length) {
+			setExistingOrderItems(maybePopulated);
+			return;
+		}
 		try {
+			const orderItemIds = order.orderitem_ids
+				.map((entry) => getRefId(entry))
+				.filter(Boolean);
 			const orderItems = (await Promise.all(
-				order.orderitem_ids.map((id) => restApi.orderitems.getById(id)),
+				orderItemIds.map((id) => restApi.orderitems.getById(id)),
 			)) as OrderItem[];
 			setExistingOrderItems(orderItems);
 		} catch (err) {
@@ -405,7 +416,7 @@ export default function OrdersPage() {
 				const trackingReference = String(
 					formData.get("trackingReference") ?? "",
 				).trim();
-				await restApi.ordersExtra.patch(editingOrder._id, {
+				const updatedOrder = await restApi.ordersExtra.patch(editingOrder._id, {
 					order_status,
 					...(formDeliveryDate && {
 						deliveryDate: formDeliveryDate.toISOString(),
@@ -413,6 +424,16 @@ export default function OrdersPage() {
 					...(deliveryStatus && { deliveryStatus }),
 					...(trackingReference && { trackingReference }),
 				});
+				setSelectedOrder((current) =>
+					current && current._id === editingOrder._id
+						? {
+								...current,
+								...updatedOrder,
+								orderitem_ids:
+									current.orderitem_ids ?? updatedOrder.orderitem_ids,
+							}
+						: current,
+				);
 			} else {
 				const createdOrder = await restApi.orders.create({
 					user_id,
@@ -659,6 +680,50 @@ export default function OrdersPage() {
 							</Select>
 						</div>
 					)}
+					{editingOrder && (
+						<div className="space-y-2">
+							<Label>Order items</Label>
+							<div className="border border-input rounded-md p-3 bg-background space-y-2 max-h-56 overflow-y-auto">
+								{existingOrderItems.length === 0 && (
+									<p className="text-sm text-muted-foreground">
+										No linked order items found.
+									</p>
+								)}
+								{existingOrderItems.map((orderItem) => {
+									const itemId = getRefId(orderItem.item_id);
+									const itemRef =
+										orderItem.item_id && typeof orderItem.item_id === "object"
+											? (orderItem.item_id as {
+													itemName?: string;
+													brandName?: string;
+													_id?: string;
+												})
+											: null;
+									const itemName =
+										[itemRef?.itemName, itemRef?.brandName]
+											.filter(Boolean)
+											.join(" · ") ||
+										(itemId ? itemLabelById.get(itemId) : undefined) ||
+										itemRef?._id ||
+										itemId ||
+										"Unknown item";
+									return (
+										<div
+											key={orderItem._id}
+											className="grid grid-cols-[1fr,auto,auto] gap-3 text-sm">
+											<span className="truncate">{itemName}</span>
+											<span className="text-muted-foreground">
+												Qty {orderItem.quantity}
+											</span>
+											<span className="text-muted-foreground">
+												KD {Number(orderItem.price ?? 0).toFixed(2)}
+											</span>
+										</div>
+									);
+								})}
+							</div>
+						</div>
+					)}
 					{!editingOrder && (
 						<div className="space-y-2">
 							<Label>Items</Label>
@@ -832,18 +897,18 @@ export default function OrdersPage() {
 							<div className="space-y-2">
 								<Label htmlFor="deliveryStatus">Delivery status</Label>
 								<Select
-									defaultValue={editingOrder.deliveryStatus ?? ""}
+									defaultValue={editingOrder.deliveryStatus ?? "__none__"}
 									onValueChange={(v) => {
 										const el = document.querySelector<HTMLInputElement>(
 											'input[name="deliveryStatus"]',
 										);
-										if (el) el.value = v;
+										if (el) el.value = v === "__none__" ? "" : v;
 									}}>
 									<SelectTrigger>
 										<SelectValue placeholder="—" />
 									</SelectTrigger>
 									<SelectContent>
-										<SelectItem value="">—</SelectItem>
+										<SelectItem value="__none__">—</SelectItem>
 										<SelectItem value="pending">Pending</SelectItem>
 										<SelectItem value="shipped">Shipped</SelectItem>
 										<SelectItem value="delivered">Delivered</SelectItem>

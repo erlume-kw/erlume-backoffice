@@ -227,9 +227,11 @@ export default function SalesPage() {
 	const orderItemsByOrder = useMemo(() => {
 		const map = new Map<string, OrderItem[]>();
 		safeOrderItems.forEach((oi) => {
-			const list = map.get(oi.order_id) ?? [];
+			const orderId = getRefId(oi.order_id);
+			if (!orderId) return;
+			const list = map.get(orderId) ?? [];
 			list.push(oi);
-			map.set(oi.order_id, list);
+			map.set(orderId, list);
 		});
 		return map;
 	}, [safeOrderItems]);

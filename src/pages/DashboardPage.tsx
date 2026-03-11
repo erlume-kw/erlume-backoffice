@@ -30,6 +30,7 @@ import type {
 	Category,
 	Item,
 	Order,
+	Sale,
 	Seller,
 	Transaction,
 	User,
@@ -43,6 +44,57 @@ const percentChange = (current: number, previous: number) => {
 	}
 	return ((current - previous) / previous) * 100;
 };
+
+const getRefId = (value: unknown): string => {
+	if (typeof value === "string") return value;
+	if (value && typeof value === "object") {
+		const record = value as { _id?: string };
+		return record._id ?? "";
+	}
+	return "";
+};
+
+const isDeliveredSaleByStatus = (sale: Sale) =>
+	(sale.status ?? "").trim().toLowerCase() === "delivered";
+
+const getSaleCommission = (sale: Sale) => {
+	const candidate = sale as Sale & {
+		erlumeCommissionAmount?: string;
+		erlume_commission?: string;
+	};
+	const raw =
+		sale.erlumeCommission ??
+		candidate.erlumeCommissionAmount ??
+		candidate.erlume_commission ??
+		"0";
+	const commission = Number(raw);
+	return Number.isFinite(commission) && commission >= 0 ? commission : 0;
+};
+
+const getSaleSellerPayout = (sale: Sale) => {
+	const candidate = sale as Sale & {
+		sellerPayoutAmount?: string;
+		seller_payout?: string;
+	};
+	const raw =
+		sale.sellerPayout ??
+		candidate.sellerPayoutAmount ??
+		candidate.seller_payout ??
+		"";
+	const payout = Number(raw);
+	if (Number.isFinite(payout) && payout >= 0) {
+		return payout;
+	}
+	const amount = Number(sale.amount ?? 0);
+	const commission = getSaleCommission(sale);
+	if (Number.isFinite(amount) && amount >= 0 && commission >= 0) {
+		return Math.max(0, amount - commission);
+	}
+	return 0;
+};
+
+const getSaleDate = (sale: Sale) =>
+	sale.sale_date ? new Date(sale.sale_date) : new Date(sale.createdAt);
 
 export default function DashboardPage() {
 	const loadUsers = useCallback(
@@ -67,6 +119,10 @@ export default function DashboardPage() {
 	);
 	const loadTransactions = useCallback(
 		() => restApi.transactions.getAll() as Promise<Transaction[]>,
+		[],
+	);
+	const loadSales = useCallback(
+		() => restApi.sales.getAll() as Promise<Sale[]>,
 		[],
 	);
 
@@ -100,6 +156,11 @@ export default function DashboardPage() {
 		loading: transactionsLoading,
 		error: transactionsError,
 	} = useResourceList(loadTransactions);
+	const {
+		data: sales,
+		loading: salesLoading,
+		error: salesError,
+	} = useResourceList(loadSales);
 
 	const loading =
 		usersLoading ||
@@ -107,17 +168,34 @@ export default function DashboardPage() {
 		ordersLoading ||
 		sellersLoading ||
 		categoriesLoading ||
-		transactionsLoading;
+		transactionsLoading ||
+		salesLoading;
 	const error =
 		usersError ||
 		itemsError ||
 		ordersError ||
 		sellersError ||
 		categoriesError ||
-		transactionsError;
+		transactionsError ||
+		salesError;
 
 	const dashboardKpis = useMemo(() => {
-		const totalRevenue = transactions.reduce((sum, tx) => sum + tx.amount, 0);
+		const deliveredOrderIds = new Set(
+			orders
+				.filter((order) => order.order_status?.toLowerCase() === "delivered")
+				.map((order) => order._id),
+		);
+		const deliveredSales = sales.filter((sale) => {
+			const orderId = getRefId(sale.order_id);
+			return (
+				isDeliveredSaleByStatus(sale) ||
+				(orderId ? deliveredOrderIds.has(orderId) : false)
+			);
+		});
+		const totalRevenue = deliveredSales.reduce(
+			(sum, sale) => sum + getSaleCommission(sale),
+			0,
+		);
 		const totalOrders = orders.length;
 		const totalUsers = users.length;
 		const totalItems = items.length;
@@ -152,18 +230,18 @@ export default function DashboardPage() {
 			return created >= fourteenDaysAgo && created < sevenDaysAgo;
 		}).length;
 
-		const currentRevenue = transactions
-			.filter((tx) => tx.createdAt && new Date(tx.createdAt) >= sevenDaysAgo)
-			.reduce((sum, tx) => sum + tx.amount, 0);
-		const previousRevenue = transactions
-			.filter((tx) => {
-				if (!tx.createdAt) {
+		const currentRevenue = deliveredSales
+			.filter((sale) => getSaleDate(sale) >= sevenDaysAgo)
+			.reduce((sum, sale) => sum + getSaleCommission(sale), 0);
+		const previousRevenue = deliveredSales
+			.filter((sale) => {
+				if (!sale.createdAt && !sale.sale_date) {
 					return false;
 				}
-				const created = new Date(tx.createdAt);
-				return created >= fourteenDaysAgo && created < sevenDaysAgo;
+				const saleDate = getSaleDate(sale);
+				return saleDate >= fourteenDaysAgo && saleDate < sevenDaysAgo;
 			})
-			.reduce((sum, tx) => sum + tx.amount, 0);
+			.reduce((sum, sale) => sum + getSaleCommission(sale), 0);
 
 		return {
 			totalRevenue,
@@ -175,7 +253,7 @@ export default function DashboardPage() {
 			totalItems,
 			itemsChange: percentChange(currentItems, previousItems),
 		};
-	}, [items, orders, transactions, users]);
+	}, [items, orders, sales, users]);
 
 	const revenueData = useMemo(() => {
 		const now = new Date();
@@ -185,6 +263,11 @@ export default function DashboardPage() {
 			return date;
 		});
 
+		const deliveredOrderIds = new Set(
+			orders
+				.filter((order) => order.order_status?.toLowerCase() === "delivered")
+				.map((order) => order._id),
+		);
 		const totals = new Map<string, { revenue: number; orders: number }>();
 		orders.forEach((order) => {
 			const key = toDateKey(new Date(order.createdAt));
@@ -192,13 +275,17 @@ export default function DashboardPage() {
 			current.orders += 1;
 			totals.set(key, current);
 		});
-		transactions.forEach((tx) => {
-			if (!tx.createdAt) {
+		sales.forEach((sale) => {
+			const orderId = getRefId(sale.order_id);
+			const isDelivered =
+				isDeliveredSaleByStatus(sale) ||
+				(orderId ? deliveredOrderIds.has(orderId) : false);
+			if (!isDelivered || (!sale.createdAt && !sale.sale_date)) {
 				return;
 			}
-			const key = toDateKey(new Date(tx.createdAt));
+			const key = toDateKey(getSaleDate(sale));
 			const current = totals.get(key) ?? { revenue: 0, orders: 0 };
-			current.revenue += tx.amount;
+			current.revenue += getSaleCommission(sale);
 			totals.set(key, current);
 		});
 
@@ -214,7 +301,7 @@ export default function DashboardPage() {
 				orders: totalsForDay.orders,
 			};
 		});
-	}, [orders, transactions]);
+	}, [orders, sales]);
 
 	const categoryData = useMemo(() => {
 		const categoriesById = new Map(
@@ -236,7 +323,7 @@ export default function DashboardPage() {
 				revenue: 0,
 			};
 			current.count += 1;
-			current.revenue += item.basePrice;
+			current.revenue += Number(item.basePrice ?? 0) || 0;
 			totals.set(item.category_id, current);
 		});
 
@@ -272,9 +359,12 @@ export default function DashboardPage() {
 		const usersById = new Map(users.map((user) => [user._id, user]));
 		const totalsByOrder = new Map<string, number>();
 		transactions.forEach((tx) => {
+			const amount = Number(tx.amount ?? 0) || 0;
+			const orderId = getRefId(tx.order_id);
+			if (!orderId) return;
 			totalsByOrder.set(
-				tx.order_id,
-				(totalsByOrder.get(tx.order_id) ?? 0) + tx.amount,
+				orderId,
+				(totalsByOrder.get(orderId) ?? 0) + amount,
 			);
 		});
 		return [...orders]
@@ -311,15 +401,61 @@ export default function DashboardPage() {
 	}, [orders, transactions, users]);
 
 	const topSellers = useMemo(() => {
-		return [...sellers]
-			.sort((a, b) => b.balance - a.balance)
-			.slice(0, 5)
-			.map((seller) => ({
-				name: seller.userId,
-				sales: seller.itemIds?.length ?? 0,
-				revenue: seller.balance,
-			}));
-	}, [sellers]);
+		const usersById = new Map(users.map((user) => [user._id, user]));
+		const sellerUserIdBySellerDocId = new Map(
+			sellers.map((seller) => [seller._id, getRefId(seller.userId)]),
+		);
+		const sellerStatsByUserId = new Map<
+			string,
+			{ sales: number; revenue: number }
+		>();
+		const deliveredOrderIds = new Set(
+			orders
+				.filter((order) => order.order_status?.toLowerCase() === "delivered")
+				.map((order) => order._id),
+		);
+		const itemById = new Map(items.map((item) => [item._id, item]));
+
+		sales.forEach((sale) => {
+			const orderId = getRefId(sale.order_id);
+			const isDelivered =
+				isDeliveredSaleByStatus(sale) ||
+				(orderId ? deliveredOrderIds.has(orderId) : false);
+			if (!isDelivered) return;
+
+			const itemId = getRefId(sale.item_id);
+			if (!itemId) return;
+			const item = itemById.get(itemId);
+			if (!item) return;
+
+			const sellerRef =
+				(item as Item & { sellerId?: string }).sellerId ?? item.seller_id ?? "";
+			const sellerRefId = getRefId(sellerRef);
+			if (!sellerRefId) return;
+			const sellerUserId =
+				sellerUserIdBySellerDocId.get(sellerRefId) ?? sellerRefId;
+
+			const current = sellerStatsByUserId.get(sellerUserId) ?? {
+				sales: 0,
+				revenue: 0,
+			};
+			current.sales += 1;
+			current.revenue += getSaleSellerPayout(sale);
+			sellerStatsByUserId.set(sellerUserId, current);
+		});
+
+		return Array.from(sellerStatsByUserId.entries())
+			.map(([sellerUserId, stats]) => ({
+				name:
+					usersById.get(sellerUserId)?.emailAddress ??
+					usersById.get(sellerUserId)?.username ??
+					sellerUserId,
+				sales: stats.sales,
+				revenue: stats.revenue,
+			}))
+			.sort((a, b) => b.revenue - a.revenue || b.sales - a.sales)
+			.slice(0, 5);
+	}, [items, orders, sales, sellers, users]);
 
 	return (
 		<AdminLayout>
