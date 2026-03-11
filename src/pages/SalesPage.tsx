@@ -164,6 +164,21 @@ export default function SalesPage() {
 		() => new Map(safeOrderItems.map((oi) => [oi._id, oi])),
 		[safeOrderItems],
 	);
+	const getOrderLabel = (value: unknown): string => {
+		const id = getRefId(value);
+		if (!id) return "—";
+		return orderLabelById.get(id) ?? id;
+	};
+	const getOrderItemLabel = (value: unknown): string => {
+		const id = getRefId(value);
+		if (!id) return "—";
+		return orderItemLabelById.get(id) ?? id;
+	};
+	const getTransactionLabel = (value: unknown): string => {
+		const id = getRefId(value);
+		if (!id) return "—";
+		return transactionLabelById.get(id) ?? id;
+	};
 	const getNormalizedRate = (rawRate: string): number | null => {
 		const parsed = Number(rawRate);
 		if (!Number.isFinite(parsed) || parsed < 0) return null;
@@ -223,32 +238,20 @@ export default function SalesPage() {
 		{
 			key: "order_id",
 			header: "Order",
-			render: (s) => (
-				<span className="text-sm">
-					{s.order_id ? orderLabelById.get(s.order_id) ?? s.order_id : "—"}
-				</span>
-			),
+			render: (s) => <span className="text-sm">{getOrderLabel(s.order_id)}</span>,
 		},
 		{
 			key: "order_item_id",
 			header: "Order item",
 			render: (s) => (
-				<span className="text-sm">
-					{s.order_item_id
-						? orderItemLabelById.get(s.order_item_id) ?? s.order_item_id
-						: "—"}
-				</span>
+				<span className="text-sm">{getOrderItemLabel(s.order_item_id)}</span>
 			),
 		},
 		{
 			key: "transaction_id",
 			header: "Transaction",
 			render: (s) => (
-				<span className="text-sm">
-					{s.transaction_id
-						? transactionLabelById.get(s.transaction_id) ?? s.transaction_id
-						: "—"}
-				</span>
+				<span className="text-sm">{getTransactionLabel(s.transaction_id)}</span>
 			),
 		},
 		{
@@ -296,7 +299,7 @@ export default function SalesPage() {
 		const q = search.toLowerCase();
 		return safeSales.filter(
 			(s) =>
-				(s.order_id ?? "").toLowerCase().includes(q) ||
+				getRefId(s.order_id).toLowerCase().includes(q) ||
 				(s.invoice_number ?? "").toLowerCase().includes(q) ||
 				(s.buyer ?? "").toLowerCase().includes(q) ||
 				(s.bag_record ?? "").toLowerCase().includes(q),
@@ -465,11 +468,15 @@ export default function SalesPage() {
 					onView={(s) => setSelectedSale(s)}
 					onEdit={(s) => {
 						setEditingSale(s);
-						setFormFlow(s.order_id && s.order_item_id ? "order" : "prelaunch");
-						setFormOrderId(s.order_id ?? "");
-						setFormOrderItemId(s.order_item_id ?? "");
-						setFormTransactionId(s.transaction_id ?? "");
-						setFormItemId(s.item_id ?? "");
+						setFormFlow(
+							getRefId(s.order_id) && getRefId(s.order_item_id)
+								? "order"
+								: "prelaunch",
+						);
+						setFormOrderId(getRefId(s.order_id));
+						setFormOrderItemId(getRefId(s.order_item_id));
+						setFormTransactionId(getRefId(s.transaction_id));
+						setFormItemId(getRefId(s.item_id));
 						setFormAmount(s.amount ?? "");
 						setFormListingPrice(s.listingPrice ?? "");
 						setFormErlumeCommission(getDisplayCommission(s));
@@ -477,7 +484,9 @@ export default function SalesPage() {
 						setFormBuyer(s.buyer ?? "");
 						setFormSaleStatus(s.status ?? "");
 						setFormSaleDate(
-							s.sale_date ? new Date(s.sale_date).toISOString().slice(0, 10) : "",
+							s.sale_date
+								? new Date(s.sale_date).toISOString().slice(0, 10)
+								: "",
 						);
 						setFormBagRecord(s.bag_record ?? "");
 						setFormError(null);
@@ -507,20 +516,12 @@ export default function SalesPage() {
 						<div className="grid grid-cols-2 gap-3">
 							<div className="p-3 bg-muted/30 rounded-lg col-span-2">
 								<p className="text-xs text-muted-foreground">Order</p>
-								<p className="text-sm">
-									{selectedSale.order_id
-										? (orderLabelById.get(selectedSale.order_id) ??
-											selectedSale.order_id)
-										: "—"}
-								</p>
+								<p className="text-sm">{getOrderLabel(selectedSale.order_id)}</p>
 							</div>
 							<div className="p-3 bg-muted/30 rounded-lg col-span-2">
 								<p className="text-xs text-muted-foreground">Order item</p>
 								<p className="text-sm">
-									{selectedSale.order_item_id
-										? (orderItemLabelById.get(selectedSale.order_item_id) ??
-											selectedSale.order_item_id)
-										: "—"}
+									{getOrderItemLabel(selectedSale.order_item_id)}
 								</p>
 							</div>
 							<div className="p-3 bg-muted/30 rounded-lg col-span-2">
@@ -540,16 +541,16 @@ export default function SalesPage() {
 								</p>
 							</div>
 							<div className="p-3 bg-muted/30 rounded-lg">
-								<p className="text-xs text-muted-foreground">Erlume commission</p>
+								<p className="text-xs text-muted-foreground">
+									Erlume commission
+								</p>
 								<p className="text-sm">
 									{selectedSale.erlumeCommission
-										? `KD ${Number(
-												selectedSale.erlumeCommission,
-											).toFixed(2)}`
+										? `KD ${Number(selectedSale.erlumeCommission).toFixed(2)}`
 										: getDisplayCommission(selectedSale)
-											? `KD ${Number(
-													getDisplayCommission(selectedSale),
-												).toFixed(2)}`
+										? `KD ${Number(getDisplayCommission(selectedSale)).toFixed(
+												2,
+										  )}`
 										: "—"}
 								</p>
 							</div>
@@ -559,19 +560,16 @@ export default function SalesPage() {
 									{selectedSale.sellerPayout
 										? `KD ${Number(selectedSale.sellerPayout).toFixed(2)}`
 										: getDisplaySellerPayout(selectedSale)
-											? `KD ${Number(
-													getDisplaySellerPayout(selectedSale),
-												).toFixed(2)}`
+										? `KD ${Number(
+												getDisplaySellerPayout(selectedSale),
+										  ).toFixed(2)}`
 										: "—"}
 								</p>
 							</div>
 							<div className="p-3 bg-muted/30 rounded-lg col-span-2">
 								<p className="text-xs text-muted-foreground">Transaction</p>
 								<p className="text-sm">
-									{selectedSale.transaction_id
-										? transactionLabelById.get(selectedSale.transaction_id) ??
-										  selectedSale.transaction_id
-										: "—"}
+									{getTransactionLabel(selectedSale.transaction_id)}
 								</p>
 							</div>
 							{selectedSale.invoice_url && (
@@ -589,14 +587,15 @@ export default function SalesPage() {
 							onClick={() => {
 								setEditingSale(selectedSale);
 								setFormFlow(
-									selectedSale.order_id && selectedSale.order_item_id
+									getRefId(selectedSale.order_id) &&
+										getRefId(selectedSale.order_item_id)
 										? "order"
 										: "prelaunch",
 								);
-								setFormOrderId(selectedSale.order_id ?? "");
-								setFormOrderItemId(selectedSale.order_item_id ?? "");
-								setFormTransactionId(selectedSale.transaction_id ?? "");
-								setFormItemId(selectedSale.item_id ?? "");
+								setFormOrderId(getRefId(selectedSale.order_id));
+								setFormOrderItemId(getRefId(selectedSale.order_item_id));
+								setFormTransactionId(getRefId(selectedSale.transaction_id));
+								setFormItemId(getRefId(selectedSale.item_id));
 								setFormAmount(selectedSale.amount ?? "");
 								setFormListingPrice(selectedSale.listingPrice ?? "");
 								setFormErlumeCommission(getDisplayCommission(selectedSale));
@@ -605,7 +604,9 @@ export default function SalesPage() {
 								setFormSaleStatus(selectedSale.status ?? "");
 								setFormSaleDate(
 									selectedSale.sale_date
-										? new Date(selectedSale.sale_date).toISOString().slice(0, 10)
+										? new Date(selectedSale.sale_date)
+												.toISOString()
+												.slice(0, 10)
 										: "",
 								);
 								setFormBagRecord(selectedSale.bag_record ?? "");

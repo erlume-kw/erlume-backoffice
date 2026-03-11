@@ -22,6 +22,14 @@ import { useResourceList } from "@/hooks/use-resource-list";
 import { FilterBar } from "@/components/common/FilterBar";
 
 export default function TransactionsPage() {
+	const getRefId = (value: unknown): string => {
+		if (typeof value === "string") return value;
+		if (value && typeof value === "object") {
+			const record = value as Record<string, unknown>;
+			if (typeof record._id === "string") return record._id;
+		}
+		return "";
+	};
 	const [search, setSearch] = useState("");
 	const [filters, setFilters] = useState<Record<string, string | undefined>>(
 		{},
@@ -114,7 +122,10 @@ export default function TransactionsPage() {
 			header: "Order",
 			render: (tx) => (
 				<span className="text-sm">
-					{orderLabelById.get(tx.order_id) ?? tx.order_id}
+					{(() => {
+						const orderId = getRefId(tx.order_id);
+						return orderId ? orderLabelById.get(orderId) ?? orderId : "—";
+					})()}
 				</span>
 			),
 		},
@@ -156,7 +167,7 @@ export default function TransactionsPage() {
 		const q = search.toLowerCase();
 		return safeTransactions.filter(
 			(tx) =>
-				(tx.order_id ?? "").toLowerCase().includes(q) ||
+				getRefId(tx.order_id).toLowerCase().includes(q) ||
 				(tx.status ?? "").toLowerCase().includes(q) ||
 				(tx.paymentMethod ?? "").toLowerCase().includes(q),
 		);
@@ -184,7 +195,9 @@ export default function TransactionsPage() {
 		const formData = new FormData(event.currentTarget);
 		const amount = String(formData.get("amount") ?? "").trim();
 		const discount_rate = String(formData.get("discount_rate") ?? "").trim();
-		const order_id = editingTransaction?.order_id ?? formOrderId;
+		const order_id = editingTransaction
+			? getRefId(editingTransaction.order_id)
+			: formOrderId;
 
 		if (!order_id && !editingTransaction) {
 			setFormError("Order is required.");
@@ -274,7 +287,7 @@ export default function TransactionsPage() {
 					onView={(tx) => setSelectedTransaction(tx)}
 					onEdit={(tx) => {
 						setEditingTransaction(tx);
-						setFormOrderId(tx.order_id);
+						setFormOrderId(getRefId(tx.order_id));
 						setFormStatus(tx.status || "completed");
 						setFormPaymentMethod(tx.paymentMethod || "");
 						setFormDiscountId(tx.discount_id ?? "");
@@ -310,8 +323,12 @@ export default function TransactionsPage() {
 							<div className="flex justify-between py-2 border-b border-border">
 								<span className="text-muted-foreground">Order</span>
 								<span className="text-sm font-medium">
-									{orderLabelById.get(selectedTransaction.order_id) ??
-										selectedTransaction.order_id}
+									{(() => {
+										const orderId = getRefId(selectedTransaction.order_id);
+										return orderId
+											? orderLabelById.get(orderId) ?? orderId
+											: "—";
+									})()}
 								</span>
 							</div>
 							<div className="flex justify-between py-2 border-b border-border">
@@ -364,7 +381,7 @@ export default function TransactionsPage() {
 						<Select
 							value={
 								editingTransaction
-									? editingTransaction.order_id
+									? getRefId(editingTransaction.order_id)
 									: formOrderId || "__placeholder__"
 							}
 							onValueChange={(v) =>
