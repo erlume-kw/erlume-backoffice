@@ -39,6 +39,7 @@ export default function SellersPage() {
 	const [formUserId, setFormUserId] = useState("");
 	const [userSearch, setUserSearch] = useState("");
 	const [showDeleted, setShowDeleted] = useState(false);
+	const [formIsDeactivated, setFormIsDeactivated] = useState(false);
 	const [formGovernorate, setFormGovernorate] = useState("");
 	const [formCity, setFormCity] = useState("");
 	const [escalationStatusSelectValue, setEscalationStatusSelectValue] =
@@ -80,13 +81,13 @@ export default function SellersPage() {
 	const { data: users } = useResourceList(loadUsers);
 	const { data: governorates } = useResourceList(loadGovernorates);
 	const { data: cities } = useResourceList(loadCities);
-	const { data: items } = useResourceList(loadItems);
+	const { data: items, reload: reloadItems } = useResourceList(loadItems);
 	const userLabelById = useMemo(
 		() =>
 			new Map(
 				users.map((user) => [
 					user._id,
-					user.emailAddress || user.username || user._id,
+					user.emailAddress || user.phoneNumber || user._id,
 				]),
 			),
 		[users],
@@ -183,7 +184,7 @@ export default function SellersPage() {
 			return (
 				label.includes(query) ||
 				user._id.toLowerCase().includes(query) ||
-				(user.username ?? "").toLowerCase().includes(query) ||
+				(user.phoneNumber ?? "").toLowerCase().includes(query) ||
 				(user.emailAddress ?? "").toLowerCase().includes(query)
 			);
 		});
@@ -307,7 +308,16 @@ export default function SellersPage() {
 			setFormError(null);
 			// DELETE /api/sellers/:id soft-deletes linked user and deactivates seller
 			await restApi.sellers.delete(seller._id);
-			await reload();
+			// Clear selected seller if it was the one deleted
+			if (selectedSeller?._id === seller._id) {
+				setSelectedSeller(null);
+			}
+			// Clear editing seller if it was the one deleted
+			if (editingSeller?._id === seller._id) {
+				setEditingSeller(null);
+				setShowForm(false);
+			}
+			await Promise.all([reload(), reloadItems()]);
 		} catch (err) {
 			const message =
 				err instanceof Error ? err.message : "Failed to delete seller";
@@ -322,7 +332,7 @@ export default function SellersPage() {
 		setFormError(null);
 		const updatePayload = {
 			userId: formUserId,
-			balance: Number(formData.get("balance") || 0),
+			balance: String(formData.get("balance") || "0"),
 			itemIds: selectedItemIds,
 			IBAN: String(formData.get("IBAN") || ""),
 			qrCode: String(formData.get("qrCode") || ""),
@@ -360,7 +370,7 @@ export default function SellersPage() {
 				house,
 				...(flat ? { flat } : {}),
 			},
-			roles: ["SELLER"],
+			roles: ["seller"], // Backend expects lowercase: "user" | "seller" | "admin"
 			cardIds: [],
 			isDeleted: false,
 		};
@@ -389,10 +399,10 @@ export default function SellersPage() {
 				}
 			}
 			if (editingSeller) {
-				// PUT /api/sellers/{id} — use user ID so backend resolves seller (single source for seller updates)
-				const id = getSellerUserId(editingSeller);
+				// PUT /api/sellers/:id — :id is seller document _id or user id (same resolution as GET/DELETE)
+				const id = editingSeller._id;
 				if (!id) {
-					setFormError("Seller user ID is missing.");
+					setFormError("Seller ID is missing.");
 					return;
 				}
 				await restApi.sellers.update(id, updatePayload);
@@ -401,29 +411,50 @@ export default function SellersPage() {
 				const previousItemIds = editingSeller.itemIds ?? [];
 				const itemSyncErrors: string[] = [];
 				let firstErrorMessage: string | null = null;
-				// Try PATCH first (partial update); fallback to PUT with minimal payload. Send both seller_id and sellerId for backend compatibility.
+				// Try PATCH first (partial update), then PUT fallback.
+				// For clear, backend validators can reject null ObjectId, so we try a few payload shapes.
 				const assignPayload = { seller_id: sellerDocId, sellerId: sellerDocId };
-				const unassignPayload = { seller_id: null, sellerId: null };
+				const clearPayloadCandidates: Array<Record<string, unknown>> = [
+					{ seller_id: null, sellerId: null },
+					{ seller_id: "" },
+					{ sellerId: "" },
+				];
 				const updateItemSeller = async (
 					itemId: string,
-					payload: { seller_id: string | null; sellerId: string | null },
+					payloads: Array<Record<string, unknown>>,
+					options?: { ignoreValidationError?: boolean },
 				): Promise<void> => {
-					try {
-						await restApi.items.patch(itemId, payload);
-					} catch (patchErr) {
-						const msg = patchErr instanceof Error ? patchErr.message : String(patchErr);
-						if (!firstErrorMessage) firstErrorMessage = msg;
+					let lastError: unknown;
+					for (const payload of payloads) {
 						try {
-							await restApi.items.update(itemId, payload as Partial<Item>);
-						} catch (putErr) {
-							if (!firstErrorMessage) firstErrorMessage = putErr instanceof Error ? putErr.message : String(putErr);
-							throw putErr;
+							await restApi.items.patch(itemId, payload);
+							return;
+						} catch (patchErr) {
+							lastError = patchErr;
+							try {
+								await restApi.items.update(itemId, payload as Partial<Item>);
+								return;
+							} catch (putErr) {
+								lastError = putErr;
+							}
 						}
 					}
+					const message =
+						lastError instanceof Error ? lastError.message : String(lastError);
+					if (
+						options?.ignoreValidationError &&
+						message.toLowerCase().includes("validation error")
+					) {
+						// Some backends disallow explicit clearing of seller_id (ObjectId validator).
+						// Seller document is still saved; skip blocking submit on this specific case.
+						return;
+					}
+					if (!firstErrorMessage) firstErrorMessage = message;
+					throw lastError;
 				};
 				for (const itemId of selectedItemIds) {
 					try {
-						await updateItemSeller(itemId, assignPayload);
+						await updateItemSeller(itemId, [assignPayload]);
 					} catch (e) {
 						console.error("Failed to set item seller_id:", itemId, e);
 						itemSyncErrors.push(itemId);
@@ -432,7 +463,9 @@ export default function SellersPage() {
 				for (const itemId of previousItemIds) {
 					if (selectedItemIds.includes(itemId)) continue;
 					try {
-						await updateItemSeller(itemId, unassignPayload);
+						await updateItemSeller(itemId, clearPayloadCandidates, {
+							ignoreValidationError: true,
+						});
 					} catch (e) {
 						console.error("Failed to clear item seller_id:", itemId, e);
 						itemSyncErrors.push(itemId);
@@ -444,21 +477,45 @@ export default function SellersPage() {
 							? `Seller saved, but ${itemSyncErrors.length} item(s) could not be assigned: ${firstErrorMessage}`
 							: `Seller saved, but ${itemSyncErrors.length} item(s) could not be assigned. Ensure the backend supports PATCH or PUT on /api/items/{id} with seller_id or sellerId.`,
 					);
+					// Still reload to show the updated seller data even if item sync had errors
+					await Promise.all([reload(), reloadItems()]);
 					return;
 				}
 			} else {
-				const createdUser = await restApi.users.create(createPayload);
+				let createdUser = await restApi.users.create(createPayload);
+				if (!createdUser || !createdUser._id) {
+					// If response is empty but creation succeeded (201), try to find the user by email
+					// Wait a bit for the database to be consistent
+					await new Promise((resolve) => setTimeout(resolve, 500));
+					const allUsers = await restApi.users.getAll();
+					const foundUser = allUsers.find(
+						(u) => u.emailAddress === emailAddress,
+					);
+					if (!foundUser) {
+						// Still reload to show the created seller if it exists
+						await Promise.all([reload(), reloadItems()]);
+						setFormError(
+							"User was created but response was empty. Please check if the seller was created successfully.",
+						);
+						return;
+					}
+					createdUser = foundUser;
+				}
 				// id = user ID (backend accepts seller _id or user ID)
 				await restApi.sellers.update(createdUser._id, createSellerPayload);
 			}
-			await reload();
+			await Promise.all([reload(), reloadItems()]);
+			// Clear form state
 			setShowForm(false);
 			setEditingSeller(null);
+			setFormStep(1);
+			setSelectedItemIds([]);
 			setFormPreferredPickupDate(undefined);
 			setFormPolicyAcceptedAt(undefined);
 			setFormUserId("");
 			setUserSearch("");
 			setEscalationStatusSelectValue("__none__");
+			setFormError(null);
 		} catch (err) {
 			const message =
 				err instanceof Error ? err.message : "Failed to save seller";
@@ -496,6 +553,7 @@ export default function SellersPage() {
 					setUserSearch("");
 					setFormGovernorate(governorateValues[0] ?? "");
 					setFormCity(cityValues[0] ?? "");
+					setFormIsDeactivated(false);
 					setEscalationStatusSelectValue("__none__");
 					setShowForm(true);
 				}}
@@ -536,6 +594,8 @@ export default function SellersPage() {
 								...prev,
 								status: checked ? "inactive" : "active",
 							}));
+							// Reload to ensure we have fresh data
+							reload();
 						}}
 					/>
 					<Label htmlFor="show-deleted-sellers">Show deleted</Label>
@@ -565,6 +625,7 @@ export default function SellersPage() {
 						setUserSearch("");
 						setFormGovernorate("");
 						setFormCity("");
+						setFormIsDeactivated(!!seller.isDeactivated);
 						setEscalationStatusSelectValue(
 							(seller.escalationStatus ?? "") || "__none__",
 						);
@@ -708,6 +769,7 @@ export default function SellersPage() {
 								setUserSearch("");
 								setFormGovernorate("");
 								setFormCity("");
+								setFormIsDeactivated(!!selectedSeller.isDeactivated);
 								setEscalationStatusSelectValue(
 									(selectedSeller.escalationStatus ?? "") || "__none__",
 								);
@@ -733,6 +795,7 @@ export default function SellersPage() {
 					setUserSearch("");
 					setFormGovernorate("");
 					setFormCity("");
+								setFormIsDeactivated(false);
 					setEscalationStatusSelectValue("__none__");
 				}}
 				title={editingSeller ? "Update Seller" : "Create Seller"}
@@ -836,17 +899,10 @@ export default function SellersPage() {
 									<div className="space-y-2">
 										<Label htmlFor="status">Status</Label>
 										<Select
-											defaultValue={
-												editingSeller?.isDeactivated ? "inactive" : "active"
-											}
-											onValueChange={(value) => {
-												const field = document.querySelector<HTMLInputElement>(
-													'input[name="isDeactivated"]',
-												);
-												if (field) {
-													field.value = value === "inactive" ? "on" : "off";
-												}
-											}}>
+											value={formIsDeactivated ? "inactive" : "active"}
+											onValueChange={(value) =>
+												setFormIsDeactivated(value === "inactive")
+											}>
 											<SelectTrigger>
 												<SelectValue placeholder="Select status" />
 											</SelectTrigger>
@@ -858,7 +914,8 @@ export default function SellersPage() {
 										<input
 											type="hidden"
 											name="isDeactivated"
-											defaultValue={editingSeller?.isDeactivated ? "on" : "off"}
+											value={formIsDeactivated ? "on" : "off"}
+											readOnly
 										/>
 									</div>
 								</div>
@@ -1139,6 +1196,13 @@ export default function SellersPage() {
 							onClick={() => {
 								setShowForm(false);
 								setEditingSeller(null);
+								setFormStep(1);
+								setSelectedItemIds([]);
+								setFormError(null);
+								setFormPreferredPickupDate(undefined);
+								setFormPolicyAcceptedAt(undefined);
+								setFormUserId("");
+								setUserSearch("");
 								setEscalationStatusSelectValue("__none__");
 							}}>
 							Cancel

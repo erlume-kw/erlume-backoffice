@@ -119,7 +119,7 @@ export default function IncomesPage() {
 			new Map(
 				safeUsers.map((user) => [
 					user._id,
-					user.emailAddress || user.username || user._id,
+					user.emailAddress || user.phoneNumber || user._id,
 				]),
 			),
 		[safeUsers],

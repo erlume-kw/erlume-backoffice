@@ -16,7 +16,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import type { Item, Order, OrderItem, User } from "@/types/models";
+import type { DiscountCode, Item, Order, OrderItem, User } from "@/types/models";
 import { DateTimePicker } from "@/components/ui/date-picker";
 import { Package, Calendar, User as UserIcon } from "lucide-react";
 import { restApi } from "@/lib/rest-client";
@@ -42,6 +42,7 @@ export default function OrdersPage() {
 	const [orderItemsInitialized, setOrderItemsInitialized] = useState(false);
 	const [formUserId, setFormUserId] = useState("");
 	const [userSearch, setUserSearch] = useState("");
+	const [formDiscountId, setFormDiscountId] = useState("");
 	const [formDeliveryDate, setFormDeliveryDate] = useState<Date | undefined>(
 		undefined,
 	);
@@ -61,6 +62,10 @@ export default function OrdersPage() {
 		() => restApi.items.getAll() as Promise<Item[]>,
 		[],
 	);
+	const loadDiscountCodes = useCallback(
+		() => restApi.discountcodes.getAll() as Promise<DiscountCode[]>,
+		[],
+	);
 	const {
 		data: orders,
 		loading,
@@ -70,12 +75,13 @@ export default function OrdersPage() {
 	const { data: orderStatus } = useResourceList(loadOrderStatus);
 	const { data: users } = useResourceList<User>(loadUsers);
 	const { data: items } = useResourceList<Item>(loadItems);
+	const { data: discountCodes } = useResourceList<DiscountCode>(loadDiscountCodes);
 	const userLabelById = useMemo(
 		() =>
 			new Map(
 				users.map((user) => [
 					user._id,
-					user.emailAddress || user.username || user._id,
+					user.emailAddress || user.phoneNumber || user._id,
 				]),
 			),
 		[users],
@@ -184,12 +190,14 @@ export default function OrdersPage() {
 			return (
 				label.includes(query) ||
 				user._id.toLowerCase().includes(query) ||
-				(user.username ?? "").toLowerCase().includes(query) ||
+				(user.phoneNumber ?? "").toLowerCase().includes(query) ||
 				(user.emailAddress ?? "").toLowerCase().includes(query)
 			);
 		});
 	}, [userLabelById, userSearch, users]);
-	const orderStatusValues = getEnumValues("orderStatus", orderStatus);
+	const orderStatusValues = getEnumValues("orderStatus", orderStatus).map((v) =>
+		v.toLowerCase(),
+	);
 	const orderStatusOptions = getEnumOptions("orderStatus", orderStatusValues);
 	const normalizeStatusValue = (value: string) =>
 		value.toLowerCase().replace(/\s+/g, "_").trim();
@@ -298,17 +306,22 @@ export default function OrdersPage() {
 
 	const filteredOrders = orders.filter((order) => {
 		const customerLabel = getUserLabel(order.user_id);
+		const orderUserId = getUserIdValue(order.user_id);
 		const matchesSearch =
 			search === "" ||
 			(order._id ?? "").toLowerCase().includes(search.toLowerCase()) ||
-			(getUserIdValue(order.user_id) ?? "")
+			(orderUserId ?? "")
 				.toLowerCase()
 				.includes(search.toLowerCase()) ||
 			(customerLabel ?? "").toLowerCase().includes(search.toLowerCase());
 		const matchesStatus =
 			!filters.status ||
 			normalizeStatusValue(order.order_status) === filters.status;
-		return matchesSearch && matchesStatus;
+		const matchesUser =
+			!filters.user ||
+			orderUserId === filters.user ||
+			order.user_id === filters.user;
+		return matchesSearch && matchesStatus && matchesUser;
 	});
 
 	const handleFilterChange = (key: string, value: string | undefined) => {
@@ -402,6 +415,7 @@ export default function OrdersPage() {
 				item_id: itemId,
 				quantity: Math.max(1, Number(value.quantity) || 1),
 			}));
+		// Ensure order_status is lowercase (orderStatusForApi already normalizes to lowercase)
 		const order_status = orderStatusForApi(formStatus);
 		if (!editingOrder && selectedItems.length === 0) {
 			setFormError("Select at least one item to create an order.");
@@ -412,16 +426,18 @@ export default function OrdersPage() {
 			if (editingOrder) {
 				const deliveryStatus = String(
 					formData.get("deliveryStatus") ?? "",
-				).trim();
+				)
+					.trim()
+					.toLowerCase();
 				const trackingReference = String(
 					formData.get("trackingReference") ?? "",
 				).trim();
 				const updatedOrder = await restApi.ordersExtra.patch(editingOrder._id, {
-					order_status,
+					order_status, // Already normalized to lowercase by orderStatusForApi
 					...(formDeliveryDate && {
 						deliveryDate: formDeliveryDate.toISOString(),
 					}),
-					...(deliveryStatus && { deliveryStatus }),
+					...(deliveryStatus && { deliveryStatus }), // Already normalized to lowercase
 					...(trackingReference && { trackingReference }),
 				});
 				setSelectedOrder((current) =>
@@ -435,12 +451,35 @@ export default function OrdersPage() {
 						: current,
 				);
 			} else {
-				const createdOrder = await restApi.orders.create({
+				let createdOrder = await restApi.orders.create({
 					user_id,
 					order_status,
 					orderItems: selectedItems,
 				});
-				const totalAmount = selectedItems.reduce(
+				if (!createdOrder || !createdOrder._id) {
+					// If response is empty but creation succeeded (201), try to find the order
+					// Wait a bit for the database to be consistent
+					await new Promise((resolve) => setTimeout(resolve, 500));
+					const allOrders = await restApi.orders.getAll();
+					// Find the most recent order for this user
+					const foundOrder = allOrders
+						.filter((o) => o.user_id === user_id)
+						.sort(
+							(a, b) =>
+								new Date(b.createdAt).getTime() -
+								new Date(a.createdAt).getTime(),
+						)[0];
+					if (!foundOrder) {
+						// Still reload to show the created order if it exists
+						await reload();
+						setFormError(
+							"Order was created but response was empty. Please check if the order was created successfully.",
+						);
+						return;
+					}
+					createdOrder = foundOrder;
+				}
+				const subtotal = selectedItems.reduce(
 					(sum, { item_id, quantity }) => {
 						const sel = orderItemSelections[item_id];
 						const qty = Math.max(1, Number(quantity) || 1);
@@ -449,10 +488,29 @@ export default function OrdersPage() {
 					},
 					0,
 				);
+				
+				// Get discount code if selected
+				const selectedDiscount = formDiscountId
+					? discountCodes?.find((dc) => dc._id === formDiscountId)
+					: null;
+				
+				// Calculate discount rate and final amount
+				const discountRate = selectedDiscount
+					? String(selectedDiscount.discount_percentage || "0")
+					: "0";
+				
+				const discountAmount =
+					selectedDiscount && Number(discountRate) > 0
+						? subtotal * (Number(discountRate) / 100)
+						: 0;
+				
+				const totalAmount = subtotal - discountAmount;
+				
 				await restApi.transactions.create({
 					order_id: createdOrder._id,
-					amount: String(totalAmount),
-					discount_rate: "0",
+					amount: String(Math.max(0, totalAmount)),
+					discount_rate: discountRate,
+					discount_id: selectedDiscount?._id || undefined,
 					status: "pending",
 				});
 			}
@@ -463,6 +521,7 @@ export default function OrdersPage() {
 			setFormDeliveryDate(undefined);
 			setExistingOrderItems([]);
 			setOrderItemsInitialized(false);
+			setFormDiscountId("");
 		} catch (err) {
 			const message =
 				err instanceof Error ? err.message : "Failed to save order";
@@ -520,6 +579,17 @@ export default function OrdersPage() {
 							label: "Status",
 							value: filters.status,
 							options: orderStatusOptions,
+						},
+						{
+							key: "user",
+							label: "Created By",
+							value: filters.user,
+							options: [
+								...Array.from(userLabelById.entries()).map(([userId, label]) => ({
+									value: userId,
+									label: label || userId,
+								})),
+							],
 						},
 					]}
 					onFilterChange={handleFilterChange}
@@ -640,6 +710,7 @@ export default function OrdersPage() {
 					setItemSearch("");
 					setShowSelectedOnly(false);
 					setFormUserId("");
+					setFormDiscountId("");
 					setUserSearch("");
 					setExistingOrderItems([]);
 					setOrderItemsInitialized(false);
@@ -867,6 +938,50 @@ export default function OrdersPage() {
 							</div>
 						</div>
 					)}
+					{!editingOrder && (
+						<div className="space-y-2">
+							<Label>Discount Code (Optional)</Label>
+							<Select
+								value={formDiscountId || "__none__"}
+								onValueChange={(value) =>
+									setFormDiscountId(value === "__none__" ? "" : value)
+								}>
+								<SelectTrigger>
+									<SelectValue placeholder="Select discount code" />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="__none__">None</SelectItem>
+									{discountCodes
+										?.filter((dc) => dc.is_active)
+										.map((dc) => (
+											<SelectItem key={dc._id} value={dc._id}>
+												{dc.code} ({dc.discount_percentage}% off)
+											</SelectItem>
+										))}
+								</SelectContent>
+							</Select>
+							{formDiscountId && (
+								<p className="text-xs text-muted-foreground">
+									{(() => {
+										const selected = discountCodes?.find(
+											(dc) => dc._id === formDiscountId,
+										);
+										if (!selected) return "";
+										const subtotal = Object.entries(orderItemSelections)
+											.filter(([, value]) => value.selected)
+											.reduce((sum, [, value]) => {
+												const qty = Math.max(1, Number(value.quantity) || 1);
+												const price = Number(value.price) || 0;
+												return sum + qty * price;
+											}, 0);
+										const discount = subtotal * (Number(selected.discount_percentage) / 100);
+										const total = subtotal - discount;
+										return `Subtotal: KD ${subtotal.toFixed(2)} - Discount: KD ${discount.toFixed(2)} = Total: KD ${total.toFixed(2)}`;
+									})()}
+								</p>
+							)}
+						</div>
+					)}
 					<div className="space-y-2">
 						<Label htmlFor="order_status">Status</Label>
 						<Select
@@ -941,6 +1056,7 @@ export default function OrdersPage() {
 								setShowForm(false);
 								setEditingOrder(null);
 								setFormDeliveryDate(undefined);
+								setFormDiscountId("");
 							}}>
 							Cancel
 						</Button>

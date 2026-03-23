@@ -19,7 +19,7 @@ import {
 	Briefcase,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import logoUrl from "../../../erlume_Icon_1_Transparent_green.png";
 
@@ -44,6 +44,18 @@ const navigation = [
 export function AdminSidebar() {
 	const location = useLocation();
 	const [collapsed, setCollapsed] = useState(false);
+	const [mobileOpen, setMobileOpen] = useState(false);
+	const [isDesktop, setIsDesktop] = useState(() =>
+		typeof window !== "undefined" ? window.innerWidth >= 1024 : true,
+	);
+
+	useEffect(() => {
+		const onResize = () => setIsDesktop(window.innerWidth >= 1024);
+		window.addEventListener("resize", onResize);
+		return () => window.removeEventListener("resize", onResize);
+	}, []);
+
+	const isCompact = isDesktop && collapsed;
 
 	return (
 		<>
@@ -51,48 +63,55 @@ export function AdminSidebar() {
 			<div
 				className={cn(
 					"fixed inset-0 z-40 bg-background/80 backdrop-blur-sm lg:hidden",
-					collapsed ? "hidden" : "block",
+					mobileOpen ? "block" : "hidden",
 				)}
-				onClick={() => setCollapsed(true)}
+				onClick={() => setMobileOpen(false)}
 			/>
 
 			{/* Mobile toggle button */}
 			<Button
 				variant="ghost"
 				size="icon"
-				className="fixed top-4 left-4 z-50 lg:hidden"
-				onClick={() => setCollapsed(!collapsed)}>
-				{collapsed ? <Menu className="h-5 w-5" /> : <X className="h-5 w-5" />}
+				className="fixed left-3 top-3 z-50 rounded-md border border-border bg-background/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:hidden"
+				onClick={() => setMobileOpen(!mobileOpen)}
+				aria-label={mobileOpen ? "Close sidebar" : "Open sidebar"}>
+				{mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
 			</Button>
 
 			{/* Sidebar */}
 			<aside
 				className={cn(
-					"fixed left-0 top-0 z-40 h-screen bg-sidebar border-r border-sidebar-border transition-all duration-300",
+					"fixed left-0 top-0 z-40 h-screen w-64 bg-sidebar border-r border-sidebar-border transition-all duration-300",
 					"lg:translate-x-0",
-					collapsed ? "-translate-x-full lg:w-16" : "translate-x-0 w-64",
+					mobileOpen ? "translate-x-0" : "-translate-x-full",
+					collapsed ? "lg:w-16" : "lg:w-64",
 				)}>
-				{/* Logo */}
-				<div className="flex h-16 items-center justify-between px-4 border-b border-sidebar-border">
-					<div className="flex items-center gap-2">
+				{/* Logo — click to expand / collapse (desktop); mobile overlay button still opens/closes */}
+				<div
+					className={cn(
+						"flex h-16 items-center border-b border-sidebar-border",
+						isCompact ? "justify-center px-2" : "px-4",
+					)}>
+					<button
+						type="button"
+						onClick={() => setCollapsed(!collapsed)}
+						className={cn(
+							"flex items-center gap-2 rounded-md p-1.5 text-left outline-none transition-colors",
+							"hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
+							isCompact ? "justify-center" : "min-w-0 w-full",
+						)}
+						aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
 						<img
 							src={logoUrl}
-							alt="Erlume logo"
+							alt=""
 							className="h-7 w-7 shrink-0 object-contain"
 						/>
-						{!collapsed && (
-							<span className="text-sm font-semibold text-foreground tracking-wide">
-								Erlume Backoofice
+						{!isCompact && (
+							<span className="truncate text-sm font-semibold text-foreground tracking-wide">
+								Erlume Backoffice
 							</span>
 						)}
-					</div>
-					<Button
-						variant="ghost"
-						size="icon"
-						className="hidden lg:flex text-muted-foreground hover:text-foreground"
-						onClick={() => setCollapsed(!collapsed)}>
-						<Menu className="h-5 w-5" />
-					</Button>
+					</button>
 				</div>
 
 				{/* Navigation */}
@@ -104,13 +123,14 @@ export function AdminSidebar() {
 								<li key={item.name}>
 									<NavLink
 										to={item.href}
+										onClick={() => setMobileOpen(false)}
 										className={cn(
 											"sidebar-link",
 											isActive && "sidebar-link-active",
 										)}
-										title={collapsed ? item.name : undefined}>
+										title={isCompact ? item.name : undefined}>
 										<item.icon className="h-5 w-5 flex-shrink-0" />
-										{!collapsed && <span>{item.name}</span>}
+										{!isCompact && <span>{item.name}</span>}
 									</NavLink>
 								</li>
 							);
@@ -120,7 +140,7 @@ export function AdminSidebar() {
 
 				{/* Footer */}
 				<div className="border-t border-sidebar-border p-4">
-					{!collapsed && (
+					{!isCompact && (
 						<div className="flex items-center gap-3">
 							<div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
 								<span className="text-xs font-medium text-primary">AD</span>

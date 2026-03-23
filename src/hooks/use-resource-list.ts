@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { formatApiError } from "@/lib/error-utils";
 
 export function useResourceList<T>(loadFn: () => Promise<T[]>) {
 	const [data, setData] = useState<T[]>([]);
@@ -40,9 +41,7 @@ export function useResourceList<T>(loadFn: () => Promise<T[]>) {
 			if (requestId.current !== currentId) {
 				return;
 			}
-			const message =
-				err instanceof Error ? err.message : "Failed to load data";
-			setError(message);
+			setError(formatApiError(err) || "Failed to load data");
 			setData([]);
 		} finally {
 			if (requestId.current === currentId) {

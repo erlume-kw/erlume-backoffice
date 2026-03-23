@@ -1,53 +1,63 @@
+import { lazy, Suspense } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import DashboardPage from "./pages/DashboardPage";
-import UsersPage from "./pages/UsersPage";
-import SellersPage from "./pages/SellersPage";
-import ItemsPage from "./pages/ItemsPage";
-import OrdersPage from "./pages/OrdersPage";
-import TransactionsPage from "./pages/TransactionsPage";
-import IncomesPage from "./pages/IncomesPage";
-import SalesPage from "./pages/SalesPage";
-import ExpensesPage from "./pages/ExpensesPage";
-import EmployeesPage from "./pages/EmployeesPage";
-import CategoriesPage from "./pages/CategoriesPage";
-import DropsPage from "./pages/DropsPage";
-import DiscountsPage from "./pages/DiscountsPage";
-import ReviewsPage from "./pages/ReviewsPage";
-import SubCategoriesPage from "./pages/SubCategoriesPage";
-import CreditCardsPage from "./pages/CreditCardsPage";
-import OutfitItemsPage from "./pages/OutfitItemsPage";
-import NotFound from "./pages/NotFound";
-import LoginPage from "./pages/LoginPage";
+
+const LoginPage = lazy(() => import("./pages/LoginPage"));
+const DashboardPage = lazy(() => import("./pages/DashboardPage"));
+const UsersPage = lazy(() => import("./pages/UsersPage"));
+const SellersPage = lazy(() => import("./pages/SellersPage"));
+const ItemsPage = lazy(() => import("./pages/ItemsPage"));
+const OrdersPage = lazy(() => import("./pages/OrdersPage"));
+const TransactionsPage = lazy(() => import("./pages/TransactionsPage"));
+const IncomesPage = lazy(() => import("./pages/IncomesPage"));
+const SalesPage = lazy(() => import("./pages/SalesPage"));
+const ExpensesPage = lazy(() => import("./pages/ExpensesPage"));
+const EmployeesPage = lazy(() => import("./pages/EmployeesPage"));
+const CategoriesPage = lazy(() => import("./pages/CategoriesPage"));
+const DropsPage = lazy(() => import("./pages/DropsPage"));
+const DiscountsPage = lazy(() => import("./pages/DiscountsPage"));
+const ReviewsPage = lazy(() => import("./pages/ReviewsPage"));
+const SubCategoriesPage = lazy(() => import("./pages/SubCategoriesPage"));
+const CreditCardsPage = lazy(() => import("./pages/CreditCardsPage"));
+const OutfitItemsPage = lazy(() => import("./pages/OutfitItemsPage"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
+
+const routeFallback = (
+	<div className="flex min-h-screen items-center justify-center text-muted-foreground">
+		Loading…
+	</div>
+);
 
 const App = () => (
 	<QueryClientProvider client={queryClient}>
 		<TooltipProvider>
 			<BrowserRouter>
-				<Routes>
-					<Route path="/login" element={<LoginPage />} />
-					<Route path="/" element={<DashboardPage />} />
-					<Route path="/users" element={<UsersPage />} />
-					<Route path="/sellers" element={<SellersPage />} />
-					<Route path="/items" element={<ItemsPage />} />
-					<Route path="/orders" element={<OrdersPage />} />
-					<Route path="/transactions" element={<TransactionsPage />} />
-					<Route path="/incomes" element={<IncomesPage />} />
-					<Route path="/sales" element={<SalesPage />} />
-					<Route path="/expenses" element={<ExpensesPage />} />
-					<Route path="/employees" element={<EmployeesPage />} />
-					<Route path="/categories" element={<CategoriesPage />} />
-					<Route path="/drops" element={<DropsPage />} />
-					<Route path="/discounts" element={<DiscountsPage />} />
-					<Route path="/reviews" element={<ReviewsPage />} />
-					<Route path="/subcategories" element={<SubCategoriesPage />} />
-					<Route path="/creditcards" element={<CreditCardsPage />} />
-					<Route path="/outfititems" element={<OutfitItemsPage />} />
-					<Route path="*" element={<NotFound />} />
-				</Routes>
+				<Suspense fallback={routeFallback}>
+					<Routes>
+						<Route path="/login" element={<LoginPage />} />
+						<Route path="/" element={<DashboardPage />} />
+						<Route path="/users" element={<UsersPage />} />
+						<Route path="/sellers" element={<SellersPage />} />
+						<Route path="/items" element={<ItemsPage />} />
+						<Route path="/orders" element={<OrdersPage />} />
+						<Route path="/transactions" element={<TransactionsPage />} />
+						<Route path="/incomes" element={<IncomesPage />} />
+						<Route path="/sales" element={<SalesPage />} />
+						<Route path="/expenses" element={<ExpensesPage />} />
+						<Route path="/employees" element={<EmployeesPage />} />
+						<Route path="/categories" element={<CategoriesPage />} />
+						<Route path="/drops" element={<DropsPage />} />
+						<Route path="/discounts" element={<DiscountsPage />} />
+						<Route path="/reviews" element={<ReviewsPage />} />
+						<Route path="/subcategories" element={<SubCategoriesPage />} />
+						<Route path="/creditcards" element={<CreditCardsPage />} />
+						<Route path="/outfititems" element={<OutfitItemsPage />} />
+						<Route path="*" element={<NotFound />} />
+					</Routes>
+				</Suspense>
 			</BrowserRouter>
 		</TooltipProvider>
 	</QueryClientProvider>

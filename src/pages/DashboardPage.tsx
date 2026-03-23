@@ -383,11 +383,12 @@ export default function DashboardPage() {
 							: "";
 				const user = usersById.get(userId);
 				const customer =
-					user?.username ??
+					user?.emailAddress ?? user?.phoneNumber ??
 					(typeof userRef === "string"
 						? userRef
 						: typeof userRef === "object" && userRef !== null
-							? ((userRef as { username?: string; _id?: string }).username ??
+							? ((userRef as { emailAddress?: string; phoneNumber?: string; _id?: string }).emailAddress ??
+								(userRef as { phoneNumber?: string; _id?: string }).phoneNumber ??
 								(userRef as { _id?: string })._id ??
 								"—")
 							: "—");
@@ -448,7 +449,7 @@ export default function DashboardPage() {
 			.map(([sellerUserId, stats]) => ({
 				name:
 					usersById.get(sellerUserId)?.emailAddress ??
-					usersById.get(sellerUserId)?.username ??
+					usersById.get(sellerUserId)?.phoneNumber ??
 					sellerUserId,
 				sales: stats.sales,
 				revenue: stats.revenue,

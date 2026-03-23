@@ -29,6 +29,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Tag } from "lucide-react";
 import { restApi } from "@/lib/rest-client";
+import { formatApiError } from "@/lib/error-utils";
 import { getEnumOptions, getEnumValues } from "@/lib/enums";
 import { useResourceList } from "@/hooks/use-resource-list";
 
@@ -113,7 +114,7 @@ export default function ItemsPage() {
 			new Map(
 				users.map((user) => [
 					user._id,
-					user.username || user.emailAddress || user._id,
+					user.emailAddress || user.phoneNumber || user._id,
 				]),
 			),
 		[users],
@@ -146,9 +147,9 @@ export default function ItemsPage() {
 				typeof userId === "string"
 					? userLabelById.get(userId) ?? userId ?? seller._id
 					: (() => {
-							const c = userId as { username?: string; _id?: string };
+							const c = userId as { emailAddress?: string; phoneNumber?: string; _id?: string };
 							return (
-								c?.username ??
+								c?.emailAddress ?? c?.phoneNumber ??
 								(c?._id ? userLabelById.get(c._id) : undefined) ??
 								c?._id ??
 								seller._id
@@ -476,9 +477,7 @@ export default function ItemsPage() {
 			setBrandSearch("");
 			setFormError(null);
 		} catch (err) {
-			const message =
-				err instanceof Error ? err.message : "Failed to save item";
-			setFormError(message);
+			setFormError(formatApiError(err) || "Failed to save item");
 			console.error("Failed to save item", err);
 		}
 	};

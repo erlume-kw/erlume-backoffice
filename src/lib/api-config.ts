@@ -18,23 +18,23 @@ function getOpenApiSpecUrl(): string {
 }
 export const OPENAPI_SPEC_URL = getOpenApiSpecUrl();
 
-// REST API endpoints
+// REST API endpoints (aligned with api-routes.json)
 export const endpoints = {
 	users: `${API_BASE_URL}/users`,
 	sellers: `${API_BASE_URL}/sellers`,
 	items: `${API_BASE_URL}/items`,
 	categories: `${API_BASE_URL}/categories`,
-	subcategories: `${API_BASE_URL}/subcategories`,
+	subcategories: `${API_BASE_URL}/sub-categories`,
 	orders: `${API_BASE_URL}/orders`,
-	orderitems: `${API_BASE_URL}/orderitems`,
+	orderitems: `${API_BASE_URL}/order-items`,
 	transactions: `${API_BASE_URL}/transactions`,
-	creditcards: `${API_BASE_URL}/creditcards`,
+	creditcards: `${API_BASE_URL}/credit-cards`,
 	reviews: `${API_BASE_URL}/reviews`,
 	drops: `${API_BASE_URL}/drops`,
 	demands: `${API_BASE_URL}/demands`,
-	discountcodes: `${API_BASE_URL}/discountcodes`,
+	discountcodes: `${API_BASE_URL}/discount-codes`,
 	outfits: `${API_BASE_URL}/outfits`,
-	outfititems: `${API_BASE_URL}/outfititems`,
+	outfititems: `${API_BASE_URL}/outfit-items`,
 	incomes: `${API_BASE_URL}/incomes`,
 	expenses: `${API_BASE_URL}/expenses`,
 	sales: `${API_BASE_URL}/sales`,

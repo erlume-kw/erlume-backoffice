@@ -47,8 +47,12 @@ Users
 
 Sellers
 
+- GET `/api/sellers`
+- GET `/api/sellers/:id`
+- POST `/api/sellers`
 - PUT `/api/sellers/:id`
 - PATCH `/api/sellers/:id`
+- DELETE `/api/sellers/:id`
 
 Items
 
@@ -68,11 +72,11 @@ Categories
 
 SubCategories
 
-- GET `/api/subcategories`
-- GET `/api/subcategories/:id`
-- POST `/api/subcategories`
-- PUT `/api/subcategories/:id`
-- DELETE `/api/subcategories/:id`
+- GET `/api/sub-categories`
+- GET `/api/sub-categories/:id`
+- POST `/api/sub-categories`
+- PUT `/api/sub-categories/:id`
+- DELETE `/api/sub-categories/:id`
 
 Orders
 
@@ -135,11 +139,11 @@ Demands
 
 Discount Codes
 
-- GET `/api/discountcodes`
-- GET `/api/discountcodes/:id`
-- POST `/api/discountcodes`
-- PUT `/api/discountcodes/:id`
-- DELETE `/api/discountcodes/:id`
+- GET `/api/discount-codes`
+- GET `/api/discount-codes/:id`
+- POST `/api/discount-codes`
+- PUT `/api/discount-codes/:id`
+- DELETE `/api/discount-codes/:id`
 
 Outfits
 
@@ -156,6 +160,43 @@ OutfitItems
 - POST `/api/outfititems`
 - PUT `/api/outfititems/:id`
 - DELETE `/api/outfititems/:id`
+
+Sales
+
+- GET `/api/sales`
+- GET `/api/sales/:id`
+- GET `/api/sales/order/:orderId`
+- POST `/api/sales`
+- POST `/api/sales/recalculate-commissions`
+- PUT `/api/sales/:id`
+- PATCH `/api/sales/:id`
+- DELETE `/api/sales/:id`
+
+Incomes
+
+- GET `/api/incomes`
+- GET `/api/incomes/:id`
+- POST `/api/incomes`
+- PUT `/api/incomes/:id`
+- PATCH `/api/incomes/:id`
+- DELETE `/api/incomes/:id`
+
+Expenses
+
+- GET `/api/expenses`
+- GET `/api/expenses/:id`
+- POST `/api/expenses`
+- PUT `/api/expenses/:id`
+- DELETE `/api/expenses/:id`
+
+Employees
+
+- GET `/api/employees`
+- GET `/api/employees/:id`
+- POST `/api/employees`
+- PUT `/api/employees/:id`
+- PATCH `/api/employees/:id`
+- DELETE `/api/employees/:id`
 
 Enums
 

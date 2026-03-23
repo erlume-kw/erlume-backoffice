@@ -26,7 +26,7 @@ export function PageHeader({
 }: PageHeaderProps) {
   return (
     <div className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl border-b border-border">
-      <div className="px-6 py-4">
+      <div className="px-4 py-4 pl-16 sm:px-6 sm:pl-20 lg:px-6 lg:pl-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h1 className="text-2xl font-semibold text-foreground">{title}</h1>

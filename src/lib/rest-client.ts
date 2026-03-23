@@ -1,13 +1,18 @@
 import { endpoints } from "./api-config";
 import type {
 	CreditCard,
+	DiscountCode,
 	Employee,
 	Expense,
 	Income,
 	Order,
+	OrderItem,
+	OutfitItem,
 	Sale,
+	SubCategory,
 	Transaction,
 } from "@/types/models";
+import { ApiError, type ApiErrorResponse } from "./api-errors";
 
 // Orders: spec only has PATCH for /api/orders/{id}, no PUT. Use ordersExtra.patch for updates.
 
@@ -40,16 +45,84 @@ async function apiRequest<T>(
 	});
 
 	if (!response.ok) {
-		const error = await response
-			.json()
-			.catch(() => ({ message: "An error occurred" }));
-		throw new Error(error.message || `HTTP ${response.status}`);
+		// Try to parse error response with new validation format
+		let errorData: ApiErrorResponse | { message?: string } | null = null;
+
+		try {
+			// Get response text first (more reliable than .json())
+			const text = await response.text();
+			
+			if (text && text.trim()) {
+				try {
+					const json = JSON.parse(text);
+					// Check if it's the new error format
+					if (
+						json &&
+						typeof json === "object" &&
+						"success" in json &&
+						json.success === false
+					) {
+						errorData = json as ApiErrorResponse;
+					} else if (json && typeof json === "object" && "message" in json) {
+						errorData = json;
+					} else if (json && typeof json === "object" && "error" in json) {
+						// Some APIs return { error: "message" } format
+						errorData = { message: String(json.error) };
+					}
+				} catch (jsonError) {
+					// Not valid JSON, treat as plain text error (but limit length)
+					const errorText = text.length > 500 ? text.substring(0, 500) + "..." : text;
+					errorData = { message: errorText };
+				}
+			}
+		} catch (parseError) {
+			// If reading response fails entirely, use default error
+			console.error(`Failed to parse error response for ${endpoint}:`, parseError);
+			errorData = null;
+		}
+
+		// Create ApiError with validation details if available
+		if (
+			errorData &&
+			typeof errorData === "object" &&
+			"success" in errorData &&
+			errorData.success === false
+		) {
+			const apiError = errorData as ApiErrorResponse;
+			throw new ApiError(
+				apiError.error || "An error occurred",
+				apiError.code,
+				apiError.details,
+				response.status,
+			);
+		}
+
+		// Fallback to generic error for backward compatibility
+		const message =
+			errorData && typeof errorData === "object" && "message" in errorData
+				? errorData.message || `HTTP ${response.status} ${response.statusText}`
+				: `HTTP ${response.status} ${response.statusText || "Error"}`;
+		throw new ApiError(message, undefined, undefined, response.status);
 	}
 
 	const text = await response.text();
 	if (!text.trim()) return undefined as T;
 	try {
-		return JSON.parse(text) as T;
+		const parsed = JSON.parse(text);
+		// Handle wrapped response format: { success: true, data: T }
+		if (
+			parsed &&
+			typeof parsed === "object" &&
+			"success" in parsed &&
+			parsed.success === true &&
+			"data" in parsed
+		) {
+			const data = parsed.data;
+			// Ensure we return the correct type (handle nested data if needed)
+			return data as T;
+		}
+		// Return direct response (backward compatibility)
+		return parsed as T;
 	} catch {
 		return undefined as T;
 	}
@@ -115,7 +188,12 @@ export const restApi = {
 			}),
 	},
 	categories: createCrudApi(endpoints.categories),
-	subcategories: createCrudApi(endpoints.subcategories),
+	subcategories: {
+		...createCrudApi<SubCategory>(endpoints.subcategories),
+		/** GET /api/sub-categories/category/:categoryId — get subcategories by category ID */
+		getByCategoryId: (categoryId: string) =>
+			apiRequest<SubCategory[]>(`${endpoints.subcategories}/category/${categoryId}`),
+	},
 	orders: {
 		getAll: (params?: Record<string, string | number | boolean | undefined>) =>
 			apiRequest<Order[]>(`${endpoints.orders}${buildQuery(params ?? {})}`),
@@ -128,15 +206,62 @@ export const restApi = {
 		delete: (id: string) =>
 			apiRequest<void>(`${endpoints.orders}/${id}`, { method: "DELETE" }),
 	},
-	orderitems: createCrudApi(endpoints.orderitems),
+	orderitems: {
+		...createCrudApi<OrderItem>(endpoints.orderitems),
+		/** GET /api/order-items/order/:orderId — get order items by order ID */
+		getByOrderId: (orderId: string) =>
+			apiRequest<OrderItem[]>(`${endpoints.orderitems}/order/${orderId}`),
+		/** PATCH /api/order-items/:id/return — mark order item as returned */
+		markReturned: (id: string) =>
+			apiRequest<OrderItem>(`${endpoints.orderitems}/${id}/return`, {
+				method: "PATCH",
+			}),
+	},
 	transactions: createCrudApi<Transaction>(endpoints.transactions),
-	creditcards: createCrudApi(endpoints.creditcards),
-	reviews: createCrudApi(endpoints.reviews),
+	creditcards: createCrudApi<CreditCard>(endpoints.creditcards),
+	reviews: {
+		...createCrudApi(endpoints.reviews),
+		/** GET /api/reviews/product/:productId — get reviews by product ID */
+		getByProductId: (productId: string) =>
+			apiRequest(`${endpoints.reviews}/product/${productId}`),
+		/** GET /api/reviews/seller/:sellerId — get reviews by seller ID */
+		getBySellerId: (sellerId: string) =>
+			apiRequest(`${endpoints.reviews}/seller/${sellerId}`),
+	},
 	drops: createCrudApi(endpoints.drops),
-	demands: createCrudApi(endpoints.demands),
-	discountcodes: createCrudApi(endpoints.discountcodes),
+	demands: {
+		...createCrudApi(endpoints.demands),
+		/** GET /api/demands/subcategory/:subCategoryId — get demands by subcategory ID */
+		getBySubCategoryId: (subCategoryId: string) =>
+			apiRequest(`${endpoints.demands}/subcategory/${subCategoryId}`),
+	},
+	discountcodes: {
+		...createCrudApi<DiscountCode>(endpoints.discountcodes),
+		/** GET /api/discount-codes/code/:code — get discount code by code string */
+		getByCode: (code: string) =>
+			apiRequest<DiscountCode>(`${endpoints.discountcodes}/code/${code}`),
+		/** POST /api/discount-codes/validate — validate discount code */
+		validate: (code: string, orderTotal?: string) =>
+			apiRequest<{ valid: boolean; discount?: string; error?: string }>(
+				`${endpoints.discountcodes}/validate`,
+				{
+					method: "POST",
+					body: JSON.stringify({ code, orderTotal }),
+				},
+			),
+	},
 	outfits: createCrudApi(endpoints.outfits),
-	outfititems: createCrudApi(endpoints.outfititems),
+	outfititems: {
+		...createCrudApi<OutfitItem>(endpoints.outfititems),
+		/** GET /api/outfit-items/outfit/:outfitId — get outfit items by outfit ID */
+		getByOutfitId: (outfitId: string) =>
+			apiRequest<OutfitItem[]>(`${endpoints.outfititems}/outfit/${outfitId}`),
+		/** PATCH /api/outfit-items/:id/featured — toggle featured status */
+		toggleFeatured: (id: string) =>
+			apiRequest<OutfitItem>(`${endpoints.outfititems}/${id}/featured`, {
+				method: "PATCH",
+			}),
+	},
 	incomes: createCrudApi<Income>(endpoints.incomes),
 	incomesExtra: {
 		create: (data: Record<string, unknown>) =>
@@ -159,8 +284,16 @@ export const restApi = {
 	sales: createCrudApi<Sale>(endpoints.sales),
 	employees: createCrudApi<Employee>(endpoints.employees),
 	salesExtra: {
-		getByOrderId: (orderId: string) =>
-			apiRequest<Sale[]>(`${endpoints.sales}/order/${orderId}`),
+		/** GET /api/sales/order/:orderId — get sales by order ID */
+		getByOrderId: (orderId: string, params?: { year?: number; month?: number }) =>
+			apiRequest<Sale[]>(
+				`${endpoints.sales}/order/${orderId}${buildQuery(params ?? {})}`,
+			),
+		/** POST /api/sales/recalculate-commissions — recalculate sale commissions */
+		recalculateCommissions: () =>
+			apiRequest(`${endpoints.sales}/recalculate-commissions`, {
+				method: "POST",
+			}),
 	},
 	/**
 	 * Enums API — OpenAPI paths: GET /api/enums, GET /api/enums/{category}.
@@ -273,7 +406,7 @@ export const restApi = {
 			),
 	},
 	creditcardsExtra: {
-		/** GET /api/creditcards/user/{userId} — list credit cards by user (OpenAPI). */
+		/** GET /api/credit-cards/user/:userId — list credit cards by user */
 		getByUserId: (userId: string) =>
 			apiRequest<CreditCard[]>(`${endpoints.creditcards}/user/${userId}`),
 	},
@@ -292,3 +425,7 @@ export const restApi = {
 };
 
 export default restApi;
+
+// Export ApiError for use in pages/components
+export { ApiError } from "./api-errors";
+export type { ValidationErrorDetail, ApiErrorResponse } from "./api-errors";

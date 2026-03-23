@@ -61,7 +61,7 @@ export default function EmployeesPage() {
 	const userLabelById = useMemo(
 		() =>
 			new Map(
-				safeUsers.map((u) => [u._id, u.emailAddress || u.username || u._id]),
+				safeUsers.map((u) => [u._id, u.emailAddress || u.phoneNumber || u._id]),
 			),
 		[safeUsers],
 	);

@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import type { User } from "@/types/models";
 import { Mail, Phone, Calendar, User as UserIcon } from "lucide-react";
-import { restApi } from "@/lib/rest-client";
+import { restApi, ApiError } from "@/lib/rest-client";
 import { getEnumOptions, getEnumValues } from "@/lib/enums";
 import { useResourceList } from "@/hooks/use-resource-list";
 
@@ -29,6 +29,7 @@ export default function UsersPage() {
 		getAll: (
 			params?: Record<string, string | number | boolean | undefined>,
 		) => Promise<User[]>;
+		getById: (id: string) => Promise<User>;
 		create: (data: Record<string, unknown>) => Promise<User>;
 		update: (id: string, data: Record<string, unknown>) => Promise<User>;
 	};
@@ -39,13 +40,20 @@ export default function UsersPage() {
 	const [selectedUser, setSelectedUser] = useState<User | null>(null);
 	const [showForm, setShowForm] = useState(false);
 	const [formError, setFormError] = useState<string | null>(null);
+	const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 	const [editingUser, setEditingUser] = useState<User | null>(null);
 	const [showDeleted, setShowDeleted] = useState(false);
 	const [formRole, setFormRole] = useState("user");
 	const [formStatus, setFormStatus] = useState("active");
 	const [formGovernorate, setFormGovernorate] = useState("");
 	const [formCity, setFormCity] = useState("");
-	const loadUsers = useCallback(() => usersApi.getAll(), [usersApi]);
+	const loadUsers = useCallback(
+		() =>
+			usersApi.getAll(
+				showDeleted ? { includeDeleted: "true" } : undefined,
+			),
+		[usersApi, showDeleted],
+	);
 	const loadUserRoles = useCallback(
 		() => restApi.enums.getByCategory("userRole"),
 		[],
@@ -70,7 +78,9 @@ export default function UsersPage() {
 		loading: citiesLoading,
 		error: citiesError,
 	} = useResourceList(loadCities);
-	const userRoleValues = getEnumValues("userRole", userRoles);
+	const userRoleValues = getEnumValues("userRole", userRoles).map((v) =>
+		v.toLowerCase(),
+	);
 	const userRoleOptions = getEnumOptions("userRole", userRoleValues);
 	const governorateValues = getEnumValues("kuwaitGovernorate", governorates);
 	const governorateOptions = getEnumOptions(
@@ -131,7 +141,7 @@ export default function UsersPage() {
 					<div>
 						<p className="font-medium text-foreground">{user.emailAddress}</p>
 						<p className="text-sm text-muted-foreground">
-							{user.username || "—"}
+							{user.phoneNumber || "—"}
 						</p>
 					</div>
 				</div>
@@ -199,12 +209,66 @@ export default function UsersPage() {
 	const handleDelete = async (id: string) => {
 		try {
 			setFormError(null);
-			await restApi.usersExtra.softDelete(id);
+			// Try PATCH first (soft delete)
+			try {
+				await restApi.usersExtra.softDelete(id);
+			} catch (patchError) {
+				// If PATCH returns 404/405, the endpoint might not be implemented
+				// Fallback: fetch user and update with PUT
+				if (
+					patchError instanceof ApiError &&
+					(patchError.statusCode === 404 || patchError.statusCode === 405)
+				) {
+					try {
+						// Fetch the user first
+						const user = await usersApi.getById(id);
+						// Update with isDeleted set to true
+						await usersApi.update(id, {
+							...user,
+							isDeleted: true,
+						} as Record<string, unknown>);
+					} catch (updateError) {
+						// If that also fails, throw the original PATCH error
+						throw patchError;
+					}
+				} else {
+					throw patchError;
+				}
+			}
 			await reload();
 		} catch (err) {
-			const message =
-				err instanceof Error ? err.message : "Failed to delete user";
-			setFormError(message);
+			if (err instanceof ApiError) {
+				// Handle API errors with better messages
+				if (err.statusCode === 404) {
+					setFormError(
+						"User not found. The user may have already been deleted, or the delete endpoint is not available.",
+					);
+				} else if (err.statusCode === 405) {
+					setFormError(
+						"Delete method not supported by the server. Please contact support.",
+					);
+				} else if (err.isValidationError()) {
+					const fieldErrors = err.getFieldErrors();
+					if (Object.keys(fieldErrors).length > 0) {
+						const errorMessages = Object.entries(fieldErrors).map(
+							([field, message]) => `${field}: ${message}`,
+						);
+						setFormError(errorMessages.join("; "));
+					} else {
+						setFormError(err.message);
+					}
+				} else {
+					// Extract readable error message from HTML responses
+					const errorMessage = err.message.includes("<!DOCTYPE")
+						? "Server returned an error page. The delete endpoint may not be implemented."
+						: err.message || "Failed to delete user";
+					setFormError(errorMessage);
+				}
+			} else {
+				const message =
+					err instanceof Error ? err.message : "Failed to delete user";
+				setFormError(message);
+			}
 			console.error("Failed to delete user", err);
 		}
 	};
@@ -218,7 +282,18 @@ export default function UsersPage() {
 		const phoneNumber = formatPhoneNumber(
 			String(formData.get("phoneNumber") || ""),
 		);
-		const roles = [formRole.toUpperCase()];
+		// Ensure role is lowercase and valid - defensive normalization
+		let normalizedRole = String(formRole || "user")
+			.toLowerCase()
+			.trim();
+		const validRoles = ["user", "seller", "admin"];
+		if (!validRoles.includes(normalizedRole)) {
+			console.warn(
+				`Invalid role "${formRole}", defaulting to "user". Valid roles: ${validRoles.join(", ")}`,
+			);
+			normalizedRole = "user";
+		}
+		const roles = [normalizedRole];
 		const isDeleted = formStatus === "inactive";
 		const address = {
 			street: String(formData.get("street") || ""),
@@ -232,11 +307,23 @@ export default function UsersPage() {
 			...(password ? { password } : {}),
 			emailAddress,
 			phoneNumber,
-			roles,
+			roles, // Already normalized to lowercase array: ["user"] | ["seller"] | ["admin"]
 			cardIds: editingUser?.cardIds ?? [],
 			isDeleted,
 			address,
 		};
+
+		// Debug: Verify roles are lowercase before sending
+		if (roles[0] && roles[0] !== roles[0].toLowerCase()) {
+			console.error(
+				"ERROR: Role is not lowercase!",
+				roles,
+				"formRole:",
+				formRole,
+			);
+			// Force lowercase as final safety check
+			payload.roles = [roles[0].toLowerCase()];
+		}
 
 		try {
 			if (!emailAddress || !phoneNumber || (!editingUser && !password)) {
@@ -262,9 +349,23 @@ export default function UsersPage() {
 			setShowForm(false);
 			setEditingUser(null);
 		} catch (err) {
-			const message =
-				err instanceof Error ? err.message : "Failed to save user";
-			setFormError(message);
+			if (err instanceof ApiError && err.isValidationError()) {
+				// Handle field-level validation errors
+				const errors = err.getFieldErrors();
+				setFieldErrors(errors);
+				
+				if (Object.keys(errors).length > 0) {
+					// Show general error message
+					setFormError("Please fix the errors below");
+				} else {
+					setFormError(err.message);
+				}
+			} else {
+				setFieldErrors({});
+				const message =
+					err instanceof Error ? err.message : "Failed to save user";
+				setFormError(message);
+			}
 			console.error("Failed to save user", err);
 		}
 	};
@@ -326,6 +427,9 @@ export default function UsersPage() {
 								...prev,
 								status: checked ? "inactive" : "active",
 							}));
+							// Reload users with new includeDeleted parameter
+							// The useResourceList hook will automatically reload when loadUsers changes
+							reload();
 						}}
 					/>
 					<Label htmlFor="show-deleted-users">Show deleted</Label>
@@ -338,7 +442,9 @@ export default function UsersPage() {
 					onView={(user) => setSelectedUser(user)}
 					onEdit={(user) => {
 						setEditingUser(user);
-						setFormRole(user.roles?.[0] || "user");
+						// Convert role to lowercase for form (backend expects lowercase)
+						const userRole = user.roles?.[0]?.toLowerCase() || "user";
+						setFormRole(userRole);
 						setFormStatus(user.isDeleted ? "inactive" : "active");
 						setFormGovernorate(user.address?.governorate || "");
 						setFormCity(user.address?.city || "");
@@ -366,11 +472,9 @@ export default function UsersPage() {
 								<h3 className="text-lg font-semibold">
 									{selectedUser.emailAddress}
 								</h3>
-								{selectedUser.username && (
-									<p className="text-sm text-muted-foreground">
-										{selectedUser.username}
-									</p>
-								)}
+								<p className="text-sm text-muted-foreground">
+									{selectedUser.phoneNumber}
+								</p>
 								<StatusBadge
 									status={selectedUser.isDeleted ? "inactive" : "active"}
 								/>
@@ -418,6 +522,8 @@ export default function UsersPage() {
 					setEditingUser(null);
 					setFormGovernorate("");
 					setFormCity("");
+					setFieldErrors({});
+					setFormError(null);
 				}}
 				title={editingUser ? "Edit User" : "Add User"}
 				type="dialog"
@@ -436,7 +542,24 @@ export default function UsersPage() {
 								required
 								defaultValue={editingUser?.emailAddress}
 								placeholder="Enter email"
+								className={
+									fieldErrors.emailAddress ? "border-destructive" : ""
+								}
+								onChange={() => {
+									if (fieldErrors.emailAddress) {
+										setFieldErrors((prev) => {
+											const next = { ...prev };
+											delete next.emailAddress;
+											return next;
+										});
+									}
+								}}
 							/>
+							{fieldErrors.emailAddress && (
+								<div className="text-sm text-destructive">
+									{fieldErrors.emailAddress}
+								</div>
+							)}
 						</div>
 						<div className="space-y-2">
 							<Label htmlFor="phoneNumber">Phone</Label>
@@ -446,7 +569,24 @@ export default function UsersPage() {
 								defaultValue={editingUser?.phoneNumber}
 								placeholder="Enter phone number"
 								required
+								className={
+									fieldErrors.phoneNumber ? "border-destructive" : ""
+								}
+								onChange={() => {
+									if (fieldErrors.phoneNumber) {
+										setFieldErrors((prev) => {
+											const next = { ...prev };
+											delete next.phoneNumber;
+											return next;
+										});
+									}
+								}}
 							/>
+							{fieldErrors.phoneNumber && (
+								<div className="text-sm text-destructive">
+									{fieldErrors.phoneNumber}
+								</div>
+							)}
 						</div>
 					</div>
 					<div className="space-y-2">
@@ -460,25 +600,54 @@ export default function UsersPage() {
 								editingUser ? "Leave blank to keep" : "Enter password"
 							}
 							required={!editingUser}
+							className={fieldErrors.password ? "border-destructive" : ""}
+							onChange={() => {
+								if (fieldErrors.password) {
+									setFieldErrors((prev) => {
+										const next = { ...prev };
+										delete next.password;
+										return next;
+									});
+								}
+							}}
 						/>
+						{fieldErrors.password && (
+							<div className="text-sm text-destructive">
+								{fieldErrors.password}
+							</div>
+						)}
 					</div>
 					<div className="grid grid-cols-2 gap-4">
 						<div className="space-y-2">
 							<Label htmlFor="role">Role</Label>
 							<Select
-								value={formRole}
-								onValueChange={(value) => setFormRole(value)}>
+								value={formRole.toLowerCase()}
+								onValueChange={(value) => setFormRole(value.toLowerCase())}>
 								<SelectTrigger>
 									<SelectValue placeholder="Select role" />
 								</SelectTrigger>
 								<SelectContent>
-									{userRoleOptions.map(({ value, label }) => (
-										<SelectItem key={value} value={value}>
-											{label}
+									{userRoleOptions.length === 0 ? (
+										<SelectItem value="user" disabled>
+											Loading roles...
 										</SelectItem>
-									))}
+									) : (
+										userRoleOptions.map(({ value, label }) => {
+											const normalizedValue = value.toLowerCase();
+											return (
+												<SelectItem key={normalizedValue} value={normalizedValue}>
+													{label}
+												</SelectItem>
+											);
+										})
+									)}
 								</SelectContent>
 							</Select>
+							{fieldErrors["roles.0"] && (
+								<div className="text-sm text-destructive">
+									{fieldErrors["roles.0"]}
+								</div>
+							)}
 						</div>
 						<div className="space-y-2">
 							<Label htmlFor="status">Status</Label>
@@ -500,7 +669,16 @@ export default function UsersPage() {
 							<Label>Governorate</Label>
 							<Select
 								value={formGovernorate}
-								onValueChange={(value) => setFormGovernorate(value)}
+								onValueChange={(value) => {
+									setFormGovernorate(value);
+									if (fieldErrors["address.governorate"]) {
+										setFieldErrors((prev) => {
+											const next = { ...prev };
+											delete next["address.governorate"];
+											return next;
+										});
+									}
+								}}
 								disabled={governoratesLoading || !!governoratesError}>
 								<SelectTrigger>
 									<SelectValue placeholder="Select governorate" />
@@ -528,13 +706,27 @@ export default function UsersPage() {
 									))}
 								</SelectContent>
 							</Select>
+							{fieldErrors["address.governorate"] && (
+								<div className="text-sm text-destructive">
+									{fieldErrors["address.governorate"]}
+								</div>
+							)}
 							<input type="hidden" name="governorate" value={formGovernorate} />
 						</div>
 						<div className="space-y-2">
 							<Label>City</Label>
 							<Select
 								value={formCity}
-								onValueChange={(value) => setFormCity(value)}
+								onValueChange={(value) => {
+									setFormCity(value);
+									if (fieldErrors["address.city"]) {
+										setFieldErrors((prev) => {
+											const next = { ...prev };
+											delete next["address.city"];
+											return next;
+										});
+									}
+								}}
 								disabled={citiesLoading || !!citiesError}>
 								<SelectTrigger>
 									<SelectValue placeholder="Select city" />
@@ -562,6 +754,11 @@ export default function UsersPage() {
 									))}
 								</SelectContent>
 							</Select>
+							{fieldErrors["address.city"] && (
+								<div className="text-sm text-destructive">
+									{fieldErrors["address.city"]}
+								</div>
+							)}
 							<input type="hidden" name="city" value={formCity} />
 						</div>
 					</div>
@@ -573,7 +770,24 @@ export default function UsersPage() {
 								name="street"
 								defaultValue={editingUser?.address?.street}
 								placeholder="Street"
+								className={
+									fieldErrors["address.street"] ? "border-destructive" : ""
+								}
+								onChange={() => {
+									if (fieldErrors["address.street"]) {
+										setFieldErrors((prev) => {
+											const next = { ...prev };
+											delete next["address.street"];
+											return next;
+										});
+									}
+								}}
 							/>
+							{fieldErrors["address.street"] && (
+								<div className="text-sm text-destructive">
+									{fieldErrors["address.street"]}
+								</div>
+							)}
 						</div>
 						<div className="space-y-2">
 							<Label htmlFor="block">Block</Label>
@@ -582,7 +796,24 @@ export default function UsersPage() {
 								name="block"
 								defaultValue={editingUser?.address?.block}
 								placeholder="Block"
+								className={
+									fieldErrors["address.block"] ? "border-destructive" : ""
+								}
+								onChange={() => {
+									if (fieldErrors["address.block"]) {
+										setFieldErrors((prev) => {
+											const next = { ...prev };
+											delete next["address.block"];
+											return next;
+										});
+									}
+								}}
 							/>
+							{fieldErrors["address.block"] && (
+								<div className="text-sm text-destructive">
+									{fieldErrors["address.block"]}
+								</div>
+							)}
 						</div>
 					</div>
 					<div className="grid grid-cols-2 gap-4">
@@ -593,7 +824,24 @@ export default function UsersPage() {
 								name="house"
 								defaultValue={editingUser?.address?.house}
 								placeholder="House"
+								className={
+									fieldErrors["address.house"] ? "border-destructive" : ""
+								}
+								onChange={() => {
+									if (fieldErrors["address.house"]) {
+										setFieldErrors((prev) => {
+											const next = { ...prev };
+											delete next["address.house"];
+											return next;
+										});
+									}
+								}}
 							/>
+							{fieldErrors["address.house"] && (
+								<div className="text-sm text-destructive">
+									{fieldErrors["address.house"]}
+								</div>
+							)}
 						</div>
 						<div className="space-y-2">
 							<Label htmlFor="flat">Flat</Label>
@@ -602,7 +850,24 @@ export default function UsersPage() {
 								name="flat"
 								defaultValue={editingUser?.address?.flat}
 								placeholder="Flat"
+								className={
+									fieldErrors["address.flat"] ? "border-destructive" : ""
+								}
+								onChange={() => {
+									if (fieldErrors["address.flat"]) {
+										setFieldErrors((prev) => {
+											const next = { ...prev };
+											delete next["address.flat"];
+											return next;
+										});
+									}
+								}}
 							/>
+							{fieldErrors["address.flat"] && (
+								<div className="text-sm text-destructive">
+									{fieldErrors["address.flat"]}
+								</div>
+							)}
 						</div>
 					</div>
 					<div className="flex gap-3 pt-4">

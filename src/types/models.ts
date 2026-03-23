@@ -11,14 +11,13 @@ export interface Address {
 
 export interface User {
 	_id: string;
-	username?: string;
 	password: string;
 	emailAddress: string;
 	phoneNumber: string;
 	address: Address;
 	roles: string[];
-	cardIds: string[];
-	isDeleted: boolean;
+	cardIds?: string[];
+	isDeleted?: boolean;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -26,13 +25,18 @@ export interface User {
 export interface Seller {
 	_id: string;
 	userId: string;
-	balance: number;
-	itemIds: string[];
-	IBAN: string;
-	qrCode: string;
-	isDeactivated: boolean;
+	fullName?: string;
+	emailAddress?: string;
+	phoneNumber?: string;
+	addressText?: string;
+	balance: string;
+	itemIds?: string[];
+	IBAN?: string;
+	qrCode?: string;
+	isDeactivated?: boolean;
 	consentGiven?: boolean;
 	preferredPickupDate?: string;
+	intakeTimestamp?: string;
 	sellerPolicyAcceptedAt?: string;
 	escalationStatus?: string;
 	escalationNotes?: string;
@@ -43,10 +47,12 @@ export interface Seller {
 export interface Category {
 	_id: string;
 	name: string;
-	base_rate: number;
-	op_rate?: number;
-	clean_rate?: number;
+	base_rate: string;
+	op_rate?: string;
+	clean_rate?: string;
 	sub_category_id?: string;
+	createdAt: string;
+	updatedAt: string;
 }
 
 export interface SubCategory {
@@ -54,13 +60,16 @@ export interface SubCategory {
 	sub_cat_name: string;
 	category_id: string;
 	demand_id?: string;
-	sub_clean_rate: number;
+	sub_clean_rate?: string;
+	createdAt: string;
+	updatedAt: string;
 }
 
 /** Item — canonical schema: itemName, brandName (only brand field; do not use brand), basePrice, condition, uploadedAt, saleRate, itemStatus, color, size, itemModel, year, quantity, listingPrice (required), category_id, etc. */
 export interface Item {
 	_id: string;
 	basePrice: string;
+	listingPrice: string;
 	condition: string;
 	uploadedAt: string;
 	saleRate: string;
@@ -81,7 +90,6 @@ export interface Item {
 	orderId?: string;
 	authNeeded?: boolean;
 	cleaningNeeded?: boolean;
-	listingPrice: string;
 	photographed?: boolean;
 	authenticationStatus?: string;
 	authenticatedAt?: string;
@@ -91,8 +99,8 @@ export interface Item {
 	category_id: string;
 	sub_category_id?: string;
 	drop_id?: string;
-	createdAt?: string;
-	updatedAt?: string;
+	createdAt: string;
+	updatedAt: string;
 }
 
 export interface Drop {
@@ -108,13 +116,15 @@ export interface Drop {
 export interface Demand {
 	_id: string;
 	demand_name: string;
-	demand_rate: number;
+	demand_rate?: string;
+	createdAt: string;
+	updatedAt: string;
 }
 
 export interface DiscountCode {
 	_id: string;
 	code: string;
-	discount_percentage: number;
+	discount_percentage: string;
 	expiry_date: string;
 	is_active: boolean;
 	createdAt: string;
@@ -123,10 +133,12 @@ export interface DiscountCode {
 
 export interface Review {
 	_id: string;
-	userId: string;
+	userId?: string;
 	sellerId: string;
 	rating: number;
 	description: string;
+	createdAt: string;
+	updatedAt: string;
 }
 
 export interface Order {
@@ -146,7 +158,7 @@ export interface OrderItem {
 	order_id: string;
 	item_id: string;
 	quantity: number;
-	price: number;
+	price: string;
 	is_returned: boolean;
 	createdAt: string;
 	updatedAt: string;
@@ -159,17 +171,17 @@ export interface Income {
 	item_id?: string;
 	seller_id?: string;
 	amount: string;
-	month?: string;
-	prelaunch_bag?: string;
 	erlumeCommissionAmount?: string;
 	sellerPayoutAmount?: string;
 	currency?: string;
 	platform?: string;
 	income_type?: string;
 	received_at?: string;
+	month?: string;
+	prelaunch_bag?: string;
 	notes?: string;
-	createdAt?: string;
-	updatedAt?: string;
+	createdAt: string;
+	updatedAt: string;
 }
 
 export interface Transaction {
@@ -180,8 +192,8 @@ export interface Transaction {
 	discount_id?: string;
 	status: string;
 	paymentMethod?: string;
-	createdAt?: string;
-	updatedAt?: string;
+	createdAt: string;
+	updatedAt: string;
 }
 
 export interface Sale {
@@ -201,8 +213,8 @@ export interface Sale {
 	invoice_number?: string;
 	invoice_url?: string;
 	payment_evidence_url?: string;
-	createdAt?: string;
-	updatedAt?: string;
+	createdAt: string;
+	updatedAt: string;
 }
 
 export interface Expense {
@@ -212,13 +224,13 @@ export interface Expense {
 	currency?: string;
 	employee_id?: string;
 	notes?: string;
-	type?: string[];
+	type: string[];
 	month: string;
 	paidBy?: string;
 	isRecurring?: boolean;
 	phase?: string;
-	createdAt?: string;
-	updatedAt?: string;
+	createdAt: string;
+	updatedAt: string;
 }
 
 export interface Employee {
@@ -230,8 +242,8 @@ export interface Employee {
 	salaryActual?: string;
 	salaryProjected?: string;
 	user_id?: string;
-	createdAt?: string;
-	updatedAt?: string;
+	createdAt: string;
+	updatedAt: string;
 }
 
 export interface CreditCard {
@@ -239,13 +251,17 @@ export interface CreditCard {
 	cardNumber: string;
 	expiryDate: string;
 	holderName: string;
+	createdAt: string;
+	updatedAt: string;
 }
 
 export interface Outfit {
 	_id: string;
 	item_ids: string[];
 	outfit_title: string;
-	outfit_tags: string[];
+	outfit_tags: string;
+	createdAt: string;
+	updatedAt: string;
 }
 
 export interface OutfitItem {
@@ -253,6 +269,8 @@ export interface OutfitItem {
 	item_id: string;
 	outfit_id: string;
 	featured_in_product: boolean;
+	createdAt: string;
+	updatedAt: string;
 }
 
 // Dashboard KPI types
