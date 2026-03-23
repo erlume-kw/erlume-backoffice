@@ -27,7 +27,7 @@ export default function LoginPage() {
 							className="h-10 w-10 object-contain"
 						/>
 						<span className="text-base font-semibold text-foreground tracking-wide">
-							Erlume Backoofice
+							Erlume Backoffice
 						</span>
 					</div>
 					<CardTitle className="text-2xl mt-4">Admin Login</CardTitle>
