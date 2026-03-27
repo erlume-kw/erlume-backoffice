@@ -130,7 +130,11 @@ export default function IncomesPage() {
 	const getSellerUserId = (seller: Seller): string => {
 		const uid = seller.userId as unknown;
 		if (typeof uid === "string") return uid;
-		if (uid && typeof uid === "object" && "_id" in (uid as Record<string, unknown>)) {
+		if (
+			uid &&
+			typeof uid === "object" &&
+			"_id" in (uid as Record<string, unknown>)
+		) {
 			const candidate = uid as { _id?: string };
 			return candidate._id ?? seller._id;
 		}
@@ -162,19 +166,32 @@ export default function IncomesPage() {
 			),
 		[safeItems],
 	);
-	const sellerLabelById = useMemo(
-		() => {
-			const map = new Map<string, string>();
-			for (const seller of safeSellers) {
-				const sellerUserId = getSellerUserId(seller);
-				const label = userLabelById.get(sellerUserId) ?? sellerUserId ?? seller._id;
-				map.set(seller._id, label);
-				map.set(sellerUserId, label);
-			}
-			return map;
-		},
-		[safeSellers, userLabelById],
-	);
+	const sellerLabelById = useMemo(() => {
+		const map = new Map<string, string>();
+		for (const seller of safeSellers) {
+			const sellerUserId = getSellerUserId(seller);
+			const label =
+				userLabelById.get(sellerUserId) ?? sellerUserId ?? seller._id;
+			map.set(seller._id, label);
+			map.set(sellerUserId, label);
+		}
+		return map;
+	}, [safeSellers, userLabelById]);
+
+	const filteredIncomes = useMemo(() => {
+		if (!search.trim()) return safeIncomes;
+		const q = search.toLowerCase();
+		return safeIncomes.filter(
+			(inc) =>
+				getRefId(inc.order_id).toLowerCase().includes(q) ||
+				getItemDisplay(inc.item_id).toLowerCase().includes(q) ||
+				getRefId(inc.item_id).toLowerCase().includes(q) ||
+				getRefId(inc.seller_id).toLowerCase().includes(q) ||
+				(inc.prelaunch_bag ?? "").toLowerCase().includes(q) ||
+				String(inc.amount ?? "").includes(q) ||
+				(inc.notes ?? "").toLowerCase().includes(q),
+		);
+	}, [safeIncomes, search]);
 
 	const columns: Column<Income>[] = [
 		{
@@ -218,9 +235,7 @@ export default function IncomesPage() {
 				<span className="text-sm truncate max-w-[140px] block">
 					{(() => {
 						const orderId = getRefId(inc.order_id);
-						return orderId
-							? (orderLabelById.get(orderId) ?? orderId)
-							: "—";
+						return orderId ? (orderLabelById.get(orderId) ?? orderId) : "—";
 					})()}
 				</span>
 			),
@@ -246,9 +261,7 @@ export default function IncomesPage() {
 				<span className="text-sm truncate max-w-[120px] block">
 					{(() => {
 						const sellerId = getRefId(inc.seller_id);
-						return sellerId
-							? (sellerLabelById.get(sellerId) ?? sellerId)
-							: "—";
+						return sellerId ? (sellerLabelById.get(sellerId) ?? sellerId) : "—";
 					})()}
 				</span>
 			),
@@ -265,21 +278,6 @@ export default function IncomesPage() {
 			),
 		},
 	];
-
-	const filteredIncomes = useMemo(() => {
-		if (!search.trim()) return safeIncomes;
-		const q = search.toLowerCase();
-		return safeIncomes.filter(
-			(inc) =>
-				getRefId(inc.order_id).toLowerCase().includes(q) ||
-				(getItemDisplay(inc.item_id).toLowerCase().includes(q) ||
-					getRefId(inc.item_id).toLowerCase().includes(q)) ||
-				getRefId(inc.seller_id).toLowerCase().includes(q) ||
-				(inc.prelaunch_bag ?? "").toLowerCase().includes(q) ||
-				String(inc.amount ?? "").includes(q) ||
-				(inc.notes ?? "").toLowerCase().includes(q),
-		);
-	}, [safeIncomes, search]);
 
 	const handleDelete = async (id: string) => {
 		try {
@@ -335,7 +333,9 @@ export default function IncomesPage() {
 			...(order_id && { order_id }),
 			...(item_id && { item_id }),
 			...(seller_id && { seller_id }),
-			...(formPrelaunchBag.trim() && { prelaunch_bag: formPrelaunchBag.trim() }),
+			...(formPrelaunchBag.trim() && {
+				prelaunch_bag: formPrelaunchBag.trim(),
+			}),
 			...(month && { month }),
 			...(notes && { notes }),
 		};
@@ -352,15 +352,14 @@ export default function IncomesPage() {
 					payload as Record<string, unknown>,
 				);
 			} else {
-				await restApi.incomesExtra.create(
-					payload as Record<string, unknown>,
-				);
+				await restApi.incomesExtra.create(payload as Record<string, unknown>);
 			}
 			await reload();
 			setShowForm(false);
 			setEditingIncome(null);
 		} catch (err) {
-			const message = err instanceof Error ? err.message : "Failed to save income";
+			const message =
+				err instanceof Error ? err.message : "Failed to save income";
 			const mode = editingIncome ? "update" : "create";
 			const idInfo = editingIncome?._id ? ` (id: ${editingIncome._id})` : "";
 			setFormError(message);
@@ -536,18 +535,19 @@ export default function IncomesPage() {
 							</div>
 							<div className="p-3 bg-muted/30 rounded-lg col-span-2">
 								<p className="text-xs text-muted-foreground">Prelaunch bag</p>
-								<p className="text-sm">
-									{selectedIncome.prelaunch_bag || "—"}
-								</p>
+								<p className="text-sm">{selectedIncome.prelaunch_bag || "—"}</p>
 							</div>
 							<div className="p-3 bg-muted/30 rounded-lg col-span-2">
 								<p className="text-xs text-muted-foreground">Month</p>
 								<p className="text-sm">
 									{selectedIncome.month
-										? new Date(selectedIncome.month).toLocaleDateString("en-US", {
-												month: "short",
-												year: "numeric",
-											})
+										? new Date(selectedIncome.month).toLocaleDateString(
+												"en-US",
+												{
+													month: "short",
+													year: "numeric",
+												},
+											)
 										: "—"}
 								</p>
 							</div>

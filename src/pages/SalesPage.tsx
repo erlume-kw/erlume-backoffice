@@ -280,7 +280,9 @@ export default function SalesPage() {
 		{
 			key: "order_id",
 			header: "Order",
-			render: (s) => <span className="text-sm">{getOrderLabel(s.order_id)}</span>,
+			render: (s) => (
+				<span className="text-sm">{getOrderLabel(s.order_id)}</span>
+			),
 		},
 		{
 			key: "order_item_id",
@@ -449,7 +451,7 @@ export default function SalesPage() {
 	};
 
 	const availableOrderItems = formOrderId
-		? orderItemsByOrder.get(formOrderId) ?? []
+		? (orderItemsByOrder.get(formOrderId) ?? [])
 		: [];
 
 	return (
@@ -577,7 +579,9 @@ export default function SalesPage() {
 						<div className="grid grid-cols-2 gap-3">
 							<div className="p-3 bg-muted/30 rounded-lg col-span-2">
 								<p className="text-xs text-muted-foreground">Order</p>
-								<p className="text-sm">{getOrderLabel(selectedSale.order_id)}</p>
+								<p className="text-sm">
+									{getOrderLabel(selectedSale.order_id)}
+								</p>
 							</div>
 							<div className="p-3 bg-muted/30 rounded-lg col-span-2">
 								<p className="text-xs text-muted-foreground">Order item</p>
@@ -609,10 +613,10 @@ export default function SalesPage() {
 									{selectedSale.erlumeCommission
 										? `KD ${Number(selectedSale.erlumeCommission).toFixed(2)}`
 										: getDisplayCommission(selectedSale)
-										? `KD ${Number(getDisplayCommission(selectedSale)).toFixed(
-												2,
-										  )}`
-										: "—"}
+											? `KD ${Number(
+													getDisplayCommission(selectedSale),
+												).toFixed(2)}`
+											: "—"}
 								</p>
 							</div>
 							<div className="p-3 bg-muted/30 rounded-lg col-span-2">
@@ -621,10 +625,10 @@ export default function SalesPage() {
 									{selectedSale.sellerPayout
 										? `KD ${Number(selectedSale.sellerPayout).toFixed(2)}`
 										: getDisplaySellerPayout(selectedSale)
-										? `KD ${Number(
-												getDisplaySellerPayout(selectedSale),
-										  ).toFixed(2)}`
-										: "—"}
+											? `KD ${Number(
+													getDisplaySellerPayout(selectedSale),
+												).toFixed(2)}`
+											: "—"}
 								</p>
 							</div>
 							<div className="p-3 bg-muted/30 rounded-lg col-span-2">

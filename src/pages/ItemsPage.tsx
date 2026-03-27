@@ -151,11 +151,16 @@ export default function ItemsPage() {
 			const userId = seller.userId;
 			const label =
 				typeof userId === "string"
-					? userLabelById.get(userId) ?? userId ?? seller._id
+					? (userLabelById.get(userId) ?? userId ?? seller._id)
 					: (() => {
-							const c = userId as { emailAddress?: string; phoneNumber?: string; _id?: string };
+							const c = userId as {
+								emailAddress?: string;
+								phoneNumber?: string;
+								_id?: string;
+							};
 							return (
-								c?.emailAddress ?? c?.phoneNumber ??
+								c?.emailAddress ??
+								c?.phoneNumber ??
 								(c?._id ? userLabelById.get(c._id) : undefined) ??
 								c?._id ??
 								seller._id
@@ -195,7 +200,9 @@ export default function ItemsPage() {
 		);
 	});
 	const allFilteredIds = filteredItems.map((i) => i._id);
-	const allSelected = allFilteredIds.length > 0 && allFilteredIds.every((id) => selectedIds.includes(id));
+	const allSelected =
+		allFilteredIds.length > 0 &&
+		allFilteredIds.every((id) => selectedIds.includes(id));
 
 	const columns: Column<Item>[] = [
 		{
@@ -203,7 +210,9 @@ export default function ItemsPage() {
 			header: (
 				<Checkbox
 					checked={allSelected}
-					onCheckedChange={(checked) => setSelectedIds(checked ? allFilteredIds : [])}
+					onCheckedChange={(checked) =>
+						setSelectedIds(checked ? allFilteredIds : [])
+					}
 				/>
 			),
 			className: "w-10",
@@ -212,9 +221,13 @@ export default function ItemsPage() {
 					checked={selectedIds.includes(item._id)}
 					onCheckedChange={(checked) =>
 						setSelectedIds((prev) =>
-							checked ? (prev.includes(item._id) ? prev : [...prev, item._id]) : prev.filter((id) => id !== item._id),
-					)
-				}
+							checked
+								? prev.includes(item._id)
+									? prev
+									: [...prev, item._id]
+								: prev.filter((id) => id !== item._id),
+						)
+					}
 				/>
 			),
 		},
@@ -297,7 +310,6 @@ export default function ItemsPage() {
 			),
 		},
 	];
-
 
 	const itemStatusArray = Array.isArray(itemStatus) ? itemStatus : [];
 	const itemConditionArray = Array.isArray(itemCondition) ? itemCondition : [];
@@ -392,29 +404,32 @@ export default function ItemsPage() {
 			setSelectedIds([]);
 			await reload();
 		} catch (err) {
-			console.error('Bulk delete failed', err);
+			console.error("Bulk delete failed", err);
 		} finally {
 			setBulkLoading(false);
 		}
 	};
 
 	const handleBulkUpdate = async () => {
-		if (!selectedIds.length || (!bulkStatus && !bulkCondition && !bulkCategory)) return;
+		if (!selectedIds.length || (!bulkStatus && !bulkCondition && !bulkCategory))
+			return;
 		setBulkLoading(true);
 		try {
 			const patch: Record<string, string> = {};
 			if (bulkStatus) patch.itemStatus = bulkStatus;
 			if (bulkCondition) patch.condition = bulkCondition;
-		if (bulkCategory) patch.category_id = bulkCategory;
-			await Promise.all(selectedIds.map((id) => restApi.items.patch(id, patch)));
+			if (bulkCategory) patch.category_id = bulkCategory;
+			await Promise.all(
+				selectedIds.map((id) => restApi.items.patch(id, patch)),
+			);
 			setSelectedIds([]);
 			setShowBulkUpdate(false);
 			setBulkStatus("");
 			setBulkCondition("");
-		setBulkCategory("");
+			setBulkCategory("");
 			await reload();
 		} catch (err) {
-			console.error('Bulk update failed', err);
+			console.error("Bulk update failed", err);
 		} finally {
 			setBulkLoading(false);
 		}
@@ -634,16 +649,84 @@ export default function ItemsPage() {
 
 				{selectedIds.length > 0 && (
 					<div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 mb-2">
-						<span className="text-xs font-medium text-muted-foreground">{selectedIds.length} selected</span>
+						<span className="text-xs font-medium text-muted-foreground">
+							{selectedIds.length} selected
+						</span>
 						<div className="flex flex-wrap items-center gap-2 ml-auto">
-							<Button variant="destructive" size="sm" className="h-8 text-xs" disabled={bulkLoading} onClick={() => void handleBulkDelete()}>Delete Selected</Button>
-							<Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setShowBulkUpdate((v) => !v)}>{showBulkUpdate ? "Cancel" : "Bulk Update"}</Button>
+							<Button
+								variant="destructive"
+								size="sm"
+								className="h-8 text-xs"
+								disabled={bulkLoading}
+								onClick={() => void handleBulkDelete()}>
+								Delete Selected
+							</Button>
+							<Button
+								variant="outline"
+								size="sm"
+								className="h-8 text-xs"
+								onClick={() => setShowBulkUpdate((v) => !v)}>
+								{showBulkUpdate ? "Cancel" : "Bulk Update"}
+							</Button>
 							{showBulkUpdate && (
 								<>
-									<Select value={bulkStatus} onValueChange={setBulkStatus}><SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="Set status" /></SelectTrigger><SelectContent>{itemStatusOptions.map(({ value, label }) => (<SelectItem key={value} value={value} className="text-xs">{label}</SelectItem>))}</SelectContent></Select>
-									<Select value={bulkCondition} onValueChange={setBulkCondition}><SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="Set condition" /></SelectTrigger><SelectContent>{itemConditionOptions.map(({ value, label }) => (<SelectItem key={value} value={value} className="text-xs">{label}</SelectItem>))}</SelectContent></Select>
-									<Select value={bulkCategory} onValueChange={setBulkCategory}><SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Set category" /></SelectTrigger><SelectContent>{categories.map((cat) => (<SelectItem key={cat._id} value={cat._id} className="text-xs">{cat.name}</SelectItem>))}</SelectContent></Select>
-									<Button size="sm" className="h-8 text-xs" disabled={bulkLoading || (!bulkStatus && !bulkCondition && !bulkCategory)} onClick={() => void handleBulkUpdate()}>{bulkLoading ? "Updating..." : "Apply"}</Button>
+									<Select value={bulkStatus} onValueChange={setBulkStatus}>
+										<SelectTrigger className="h-8 w-36 text-xs">
+											<SelectValue placeholder="Set status" />
+										</SelectTrigger>
+										<SelectContent>
+											{itemStatusOptions.map(({ value, label }) => (
+												<SelectItem
+													key={value}
+													value={value}
+													className="text-xs">
+													{label}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+									<Select
+										value={bulkCondition}
+										onValueChange={setBulkCondition}>
+										<SelectTrigger className="h-8 w-36 text-xs">
+											<SelectValue placeholder="Set condition" />
+										</SelectTrigger>
+										<SelectContent>
+											{itemConditionOptions.map(({ value, label }) => (
+												<SelectItem
+													key={value}
+													value={value}
+													className="text-xs">
+													{label}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+									<Select value={bulkCategory} onValueChange={setBulkCategory}>
+										<SelectTrigger className="h-8 w-40 text-xs">
+											<SelectValue placeholder="Set category" />
+										</SelectTrigger>
+										<SelectContent>
+											{categories.map((cat) => (
+												<SelectItem
+													key={cat._id}
+													value={cat._id}
+													className="text-xs">
+													{cat.name}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+									<Button
+										size="sm"
+										className="h-8 text-xs"
+										disabled={
+											bulkLoading ||
+											(!bulkStatus && !bulkCondition && !bulkCategory)
+										}
+										onClick={() => void handleBulkUpdate()}>
+										{bulkLoading ? "Updating..." : "Apply"}
+									</Button>
 								</>
 							)}
 						</div>

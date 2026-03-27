@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { Search, Bell, Plus } from 'lucide-react';
+import { Search, Plus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 
@@ -47,9 +47,6 @@ export function PageHeader({
               </div>
             )}
             {children}
-            <Button variant="ghost" size="icon" className="text-muted-foreground">
-              <Bell className="h-5 w-5" />
-            </Button>
             {onAdd && (
               <Button onClick={onAdd} className="gap-2">
                 <Plus className="h-4 w-4" />

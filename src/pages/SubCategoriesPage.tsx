@@ -69,6 +69,21 @@ export default function SubCategoriesPage() {
 		[demands],
 	);
 
+	const filteredSubCategories = subcategories.filter((sub) => {
+		const query = search.toLowerCase();
+		return (
+			search === "" ||
+			(sub.sub_cat_name ?? "").toLowerCase().includes(query) ||
+			(sub.category_id ?? "").toLowerCase().includes(query) ||
+			(sub.demand_id ?? "").toLowerCase().includes(query)
+		);
+	});
+
+	const allFilteredIds = filteredSubCategories.map((s) => s._id);
+	const allSelected =
+		allFilteredIds.length > 0 &&
+		allFilteredIds.every((id) => selectedIds.includes(id));
+
 	const columns: Column<SubCategory>[] = [
 		{
 			key: "_select",
@@ -139,21 +154,6 @@ export default function SubCategoriesPage() {
 			),
 		},
 	];
-
-	const filteredSubCategories = subcategories.filter((sub) => {
-		const query = search.toLowerCase();
-		return (
-			search === "" ||
-			(sub.sub_cat_name ?? "").toLowerCase().includes(query) ||
-			(sub.category_id ?? "").toLowerCase().includes(query) ||
-			(sub.demand_id ?? "").toLowerCase().includes(query)
-		);
-	});
-
-	const allFilteredIds = filteredSubCategories.map((s) => s._id);
-	const allSelected =
-		allFilteredIds.length > 0 &&
-		allFilteredIds.every((id) => selectedIds.includes(id));
 
 	const handleDelete = async (id: string) => {
 		try {

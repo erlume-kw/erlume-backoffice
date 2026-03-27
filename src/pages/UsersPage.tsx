@@ -54,10 +54,7 @@ export default function UsersPage() {
 	const [bulkStatus, setBulkStatus] = useState("");
 	const [bulkLoading, setBulkLoading] = useState(false);
 	const loadUsers = useCallback(
-		() =>
-			usersApi.getAll(
-				showDeleted ? { includeDeleted: "true" } : undefined,
-			),
+		() => usersApi.getAll(showDeleted ? { includeDeleted: "true" } : undefined),
 		[usersApi, showDeleted],
 	);
 	const loadUserRoles = useCallback(
@@ -147,16 +144,31 @@ export default function UsersPage() {
 	});
 
 	const allFilteredUserIds = filteredUsers.map((u) => u._id);
-	const allUsersSelected = allFilteredUserIds.length > 0 && allFilteredUserIds.every((id) => selectedIds.includes(id));
+	const allUsersSelected =
+		allFilteredUserIds.length > 0 &&
+		allFilteredUserIds.every((id) => selectedIds.includes(id));
 
 	const columns: Column<User>[] = [
 		{
 			key: "_select",
 			header: (
-				<Checkbox checked={allUsersSelected} onCheckedChange={(v) => { if (v) setSelectedIds(allFilteredUserIds); else setSelectedIds([]); }} />
+				<Checkbox
+					checked={allUsersSelected}
+					onCheckedChange={(v) => {
+						if (v) setSelectedIds(allFilteredUserIds);
+						else setSelectedIds([]);
+					}}
+				/>
 			),
 			render: (user) => (
-				<Checkbox checked={selectedIds.includes(user._id)} onCheckedChange={(v) => { setSelectedIds((prev) => v ? [...prev, user._id] : prev.filter((id) => id !== user._id)); }} />
+				<Checkbox
+					checked={selectedIds.includes(user._id)}
+					onCheckedChange={(v) => {
+						setSelectedIds((prev) =>
+							v ? [...prev, user._id] : prev.filter((id) => id !== user._id),
+						);
+					}}
+				/>
 			),
 		},
 		{
@@ -210,7 +222,6 @@ export default function UsersPage() {
 		},
 	];
 
-
 	const handleFilterChange = (key: string, value: string | undefined) => {
 		if (key === "status") {
 			const nextStatus = value === "inactive" ? "inactive" : "active";
@@ -229,10 +240,16 @@ export default function UsersPage() {
 		if (!selectedIds.length) return;
 		setBulkLoading(true);
 		try {
-			await Promise.all(selectedIds.map((id) => restApi.usersExtra.softDelete(id)));
-			setSelectedIds([]); await reload();
-		} catch (err) { console.error('Bulk delete failed', err); }
-		finally { setBulkLoading(false); }
+			await Promise.all(
+				selectedIds.map((id) => restApi.usersExtra.softDelete(id)),
+			);
+			setSelectedIds([]);
+			await reload();
+		} catch (err) {
+			console.error("Bulk delete failed", err);
+		} finally {
+			setBulkLoading(false);
+		}
 	};
 
 	const handleBulkUpdate = async () => {
@@ -241,12 +258,22 @@ export default function UsersPage() {
 		try {
 			const patch: Record<string, unknown> = {};
 			if (bulkRole) patch.roles = [bulkRole];
-			if (bulkStatus) { patch.isDeleted = bulkStatus === "inactive"; }
-			await Promise.all(selectedIds.map((id) => restApi.usersExtra.patch(id, patch)));
-			setSelectedIds([]); setShowBulkUpdate(false); setBulkRole(""); setBulkStatus("");
+			if (bulkStatus) {
+				patch.isDeleted = bulkStatus === "inactive";
+			}
+			await Promise.all(
+				selectedIds.map((id) => restApi.usersExtra.patch(id, patch)),
+			);
+			setSelectedIds([]);
+			setShowBulkUpdate(false);
+			setBulkRole("");
+			setBulkStatus("");
 			await reload();
-		} catch (err) { console.error('Bulk update failed', err); }
-		finally { setBulkLoading(false); }
+		} catch (err) {
+			console.error("Bulk update failed", err);
+		} finally {
+			setBulkLoading(false);
+		}
 	};
 
 	const handleDelete = async (id: string) => {
@@ -384,7 +411,10 @@ export default function UsersPage() {
 				return;
 			}
 			if (editingUser) {
-				await usersApi.update(editingUser._id, payload as Record<string, unknown>);
+				await usersApi.update(
+					editingUser._id,
+					payload as Record<string, unknown>,
+				);
 			} else {
 				await usersApi.create(payload as Record<string, unknown>);
 			}
@@ -396,7 +426,7 @@ export default function UsersPage() {
 				// Handle field-level validation errors
 				const errors = err.getFieldErrors();
 				setFieldErrors(errors);
-				
+
 				if (Object.keys(errors).length > 0) {
 					// Show general error message
 					setFormError("Please fix the errors below");
@@ -480,15 +510,62 @@ export default function UsersPage() {
 
 				{selectedIds.length > 0 && (
 					<div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 mb-2">
-						<span className="text-xs font-medium text-muted-foreground">{selectedIds.length} selected</span>
+						<span className="text-xs font-medium text-muted-foreground">
+							{selectedIds.length} selected
+						</span>
 						<div className="flex flex-wrap items-center gap-2 ml-auto">
-							<Button variant="destructive" size="sm" className="h-8 text-xs" disabled={bulkLoading} onClick={() => void handleBulkDelete()}>Delete Selected</Button>
-							<Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setShowBulkUpdate((v) => !v)}>{showBulkUpdate ? "Cancel" : "Bulk Update"}</Button>
+							<Button
+								variant="destructive"
+								size="sm"
+								className="h-8 text-xs"
+								disabled={bulkLoading}
+								onClick={() => void handleBulkDelete()}>
+								Delete Selected
+							</Button>
+							<Button
+								variant="outline"
+								size="sm"
+								className="h-8 text-xs"
+								onClick={() => setShowBulkUpdate((v) => !v)}>
+								{showBulkUpdate ? "Cancel" : "Bulk Update"}
+							</Button>
 							{showBulkUpdate && (
 								<>
-									<Select value={bulkRole} onValueChange={setBulkRole}><SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="Set role" /></SelectTrigger><SelectContent>{userRoleOptions.map(({ value, label }) => (<SelectItem key={value} value={value} className="text-xs">{label}</SelectItem>))}</SelectContent></Select>
-									<Select value={bulkStatus} onValueChange={setBulkStatus}><SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="Set status" /></SelectTrigger><SelectContent><SelectItem value="active" className="text-xs">Active</SelectItem><SelectItem value="inactive" className="text-xs">Inactive</SelectItem></SelectContent></Select>
-									<Button size="sm" className="h-8 text-xs" disabled={bulkLoading || (!bulkRole && !bulkStatus)} onClick={() => void handleBulkUpdate()}>{bulkLoading ? "Updating..." : "Apply"}</Button>
+									<Select value={bulkRole} onValueChange={setBulkRole}>
+										<SelectTrigger className="h-8 w-36 text-xs">
+											<SelectValue placeholder="Set role" />
+										</SelectTrigger>
+										<SelectContent>
+											{userRoleOptions.map(({ value, label }) => (
+												<SelectItem
+													key={value}
+													value={value}
+													className="text-xs">
+													{label}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+									<Select value={bulkStatus} onValueChange={setBulkStatus}>
+										<SelectTrigger className="h-8 w-36 text-xs">
+											<SelectValue placeholder="Set status" />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="active" className="text-xs">
+												Active
+											</SelectItem>
+											<SelectItem value="inactive" className="text-xs">
+												Inactive
+											</SelectItem>
+										</SelectContent>
+									</Select>
+									<Button
+										size="sm"
+										className="h-8 text-xs"
+										disabled={bulkLoading || (!bulkRole && !bulkStatus)}
+										onClick={() => void handleBulkUpdate()}>
+										{bulkLoading ? "Updating..." : "Apply"}
+									</Button>
 								</>
 							)}
 						</div>
@@ -601,9 +678,7 @@ export default function UsersPage() {
 								required
 								defaultValue={editingUser?.emailAddress}
 								placeholder="Enter email"
-								className={
-									fieldErrors.emailAddress ? "border-destructive" : ""
-								}
+								className={fieldErrors.emailAddress ? "border-destructive" : ""}
 								onChange={() => {
 									if (fieldErrors.emailAddress) {
 										setFieldErrors((prev) => {
@@ -628,9 +703,7 @@ export default function UsersPage() {
 								defaultValue={editingUser?.phoneNumber}
 								placeholder="Enter phone number"
 								required
-								className={
-									fieldErrors.phoneNumber ? "border-destructive" : ""
-								}
+								className={fieldErrors.phoneNumber ? "border-destructive" : ""}
 								onChange={() => {
 									if (fieldErrors.phoneNumber) {
 										setFieldErrors((prev) => {
@@ -694,7 +767,9 @@ export default function UsersPage() {
 										userRoleOptions.map(({ value, label }) => {
 											const normalizedValue = value.toLowerCase();
 											return (
-												<SelectItem key={normalizedValue} value={normalizedValue}>
+												<SelectItem
+													key={normalizedValue}
+													value={normalizedValue}>
 													{label}
 												</SelectItem>
 											);

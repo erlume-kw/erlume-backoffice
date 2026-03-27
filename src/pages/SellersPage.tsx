@@ -46,15 +46,18 @@ export default function SellersPage() {
 		useState("__none__");
 	const [onboardingStatusSelectValue, setOnboardingStatusSelectValue] =
 		useState("__none__");
-	const [itemsOnboardingStatusSelectValue, setItemsOnboardingStatusSelectValue] =
-		useState("__none__");
+	const [
+		itemsOnboardingStatusSelectValue,
+		setItemsOnboardingStatusSelectValue,
+	] = useState("__none__");
 	const [formPreferredPickupDate, setFormPreferredPickupDate] = useState<
 		Date | undefined
 	>(undefined);
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
 	const [showBulkUpdate, setShowBulkUpdate] = useState(false);
 	const [bulkOnboardingStatus, setBulkOnboardingStatus] = useState("");
-	const [bulkItemsOnboardingStatus, setBulkItemsOnboardingStatus] = useState("");
+	const [bulkItemsOnboardingStatus, setBulkItemsOnboardingStatus] =
+		useState("");
 	const [bulkLoading, setBulkLoading] = useState(false);
 	const [formPolicyAcceptedAt, setFormPolicyAcceptedAt] = useState<
 		Date | undefined
@@ -249,7 +252,9 @@ export default function SellersPage() {
 		});
 	}, [filters.status, search, sellers]);
 	const allFilteredSellerIds = filteredSellers.map((s) => s._id);
-	const allSellersSelected = allFilteredSellerIds.length > 0 && allFilteredSellerIds.every((id) => selectedIds.includes(id));
+	const allSellersSelected =
+		allFilteredSellerIds.length > 0 &&
+		allFilteredSellerIds.every((id) => selectedIds.includes(id));
 
 	const columns: Column<Seller>[] = [
 		{
@@ -257,13 +262,22 @@ export default function SellersPage() {
 			header: (
 				<Checkbox
 					checked={allSellersSelected}
-					onCheckedChange={(v) => { if (v) setSelectedIds(allFilteredSellerIds); else setSelectedIds([]); }}
+					onCheckedChange={(v) => {
+						if (v) setSelectedIds(allFilteredSellerIds);
+						else setSelectedIds([]);
+					}}
 				/>
 			),
 			render: (seller) => (
 				<Checkbox
 					checked={selectedIds.includes(seller._id)}
-					onCheckedChange={(v) => { setSelectedIds((prev) => v ? [...prev, seller._id] : prev.filter((id) => id !== seller._id)); }}
+					onCheckedChange={(v) => {
+						setSelectedIds((prev) =>
+							v
+								? [...prev, seller._id]
+								: prev.filter((id) => id !== seller._id),
+						);
+					}}
 				/>
 			),
 		},
@@ -365,7 +379,6 @@ export default function SellersPage() {
 		},
 	];
 
-
 	const handleBulkDelete = async () => {
 		if (!selectedIds.length) return;
 		setBulkLoading(true);
@@ -373,23 +386,38 @@ export default function SellersPage() {
 			await Promise.all(selectedIds.map((id) => restApi.sellers.delete(id)));
 			setSelectedIds([]);
 			await reload();
-		} catch (err) { console.error('Bulk delete failed', err); }
-		finally { setBulkLoading(false); }
+		} catch (err) {
+			console.error("Bulk delete failed", err);
+		} finally {
+			setBulkLoading(false);
+		}
 	};
 
 	const handleBulkUpdate = async () => {
-		if (!selectedIds.length || (!bulkOnboardingStatus && !bulkItemsOnboardingStatus)) return;
+		if (
+			!selectedIds.length ||
+			(!bulkOnboardingStatus && !bulkItemsOnboardingStatus)
+		)
+			return;
 		setBulkLoading(true);
 		try {
 			const patch: Record<string, string> = {};
 			if (bulkOnboardingStatus) patch.onboardingStatus = bulkOnboardingStatus;
-			if (bulkItemsOnboardingStatus) patch.itemsOnboardingStatus = bulkItemsOnboardingStatus;
-			await Promise.all(selectedIds.map((id) => restApi.sellers.patch(id, patch)));
-			setSelectedIds([]); setShowBulkUpdate(false);
-			setBulkOnboardingStatus(""); setBulkItemsOnboardingStatus("");
+			if (bulkItemsOnboardingStatus)
+				patch.itemsOnboardingStatus = bulkItemsOnboardingStatus;
+			await Promise.all(
+				selectedIds.map((id) => restApi.sellers.patch(id, patch)),
+			);
+			setSelectedIds([]);
+			setShowBulkUpdate(false);
+			setBulkOnboardingStatus("");
+			setBulkItemsOnboardingStatus("");
 			await reload();
-		} catch (err) { console.error('Bulk update failed', err); }
-		finally { setBulkLoading(false); }
+		} catch (err) {
+			console.error("Bulk update failed", err);
+		} finally {
+			setBulkLoading(false);
+		}
 	};
 
 	const handleDelete = async (seller: Seller) => {
@@ -435,9 +463,13 @@ export default function SellersPage() {
 			escalationNotes:
 				String(formData.get("escalationNotes") || "").trim() || undefined,
 			onboardingStatus:
-				onboardingStatusSelectValue === "__none__" ? undefined : onboardingStatusSelectValue,
+				onboardingStatusSelectValue === "__none__"
+					? undefined
+					: onboardingStatusSelectValue,
 			itemsOnboardingStatus:
-				itemsOnboardingStatusSelectValue === "__none__" ? undefined : itemsOnboardingStatusSelectValue,
+				itemsOnboardingStatusSelectValue === "__none__"
+					? undefined
+					: itemsOnboardingStatusSelectValue,
 			sellerPolicyAcceptedAt: formPolicyAcceptedAt
 				? formPolicyAcceptedAt.toISOString()
 				: undefined,
@@ -473,9 +505,13 @@ export default function SellersPage() {
 				? formPreferredPickupDate.toISOString().slice(0, 10)
 				: "",
 			onboardingStatus:
-				onboardingStatusSelectValue === "__none__" ? undefined : onboardingStatusSelectValue,
+				onboardingStatusSelectValue === "__none__"
+					? undefined
+					: onboardingStatusSelectValue,
 			itemsOnboardingStatus:
-				itemsOnboardingStatusSelectValue === "__none__" ? undefined : itemsOnboardingStatusSelectValue,
+				itemsOnboardingStatusSelectValue === "__none__"
+					? undefined
+					: itemsOnboardingStatusSelectValue,
 		};
 
 		try {
@@ -715,15 +751,71 @@ export default function SellersPage() {
 
 				{selectedIds.length > 0 && (
 					<div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 mb-2">
-						<span className="text-xs font-medium text-muted-foreground">{selectedIds.length} selected</span>
+						<span className="text-xs font-medium text-muted-foreground">
+							{selectedIds.length} selected
+						</span>
 						<div className="flex flex-wrap items-center gap-2 ml-auto">
-							<Button variant="destructive" size="sm" className="h-8 text-xs" disabled={bulkLoading} onClick={() => void handleBulkDelete()}>Delete Selected</Button>
-							<Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setShowBulkUpdate((v) => !v)}>{showBulkUpdate ? "Cancel" : "Bulk Update"}</Button>
+							<Button
+								variant="destructive"
+								size="sm"
+								className="h-8 text-xs"
+								disabled={bulkLoading}
+								onClick={() => void handleBulkDelete()}>
+								Delete Selected
+							</Button>
+							<Button
+								variant="outline"
+								size="sm"
+								className="h-8 text-xs"
+								onClick={() => setShowBulkUpdate((v) => !v)}>
+								{showBulkUpdate ? "Cancel" : "Bulk Update"}
+							</Button>
 							{showBulkUpdate && (
 								<>
-									<Select value={bulkOnboardingStatus} onValueChange={setBulkOnboardingStatus}><SelectTrigger className="h-8 w-44 text-xs"><SelectValue placeholder="Set onboarding" /></SelectTrigger><SelectContent>{sellerOnboardingOptions.map(({ value, label }) => (<SelectItem key={value} value={value} className="text-xs">{label}</SelectItem>))}</SelectContent></Select>
-									<Select value={bulkItemsOnboardingStatus} onValueChange={setBulkItemsOnboardingStatus}><SelectTrigger className="h-8 w-44 text-xs"><SelectValue placeholder="Set items status" /></SelectTrigger><SelectContent>{itemsOnboardingOptions.map(({ value, label }) => (<SelectItem key={value} value={value} className="text-xs">{label}</SelectItem>))}</SelectContent></Select>
-									<Button size="sm" className="h-8 text-xs" disabled={bulkLoading || (!bulkOnboardingStatus && !bulkItemsOnboardingStatus)} onClick={() => void handleBulkUpdate()}>{bulkLoading ? "Updating..." : "Apply"}</Button>
+									<Select
+										value={bulkOnboardingStatus}
+										onValueChange={setBulkOnboardingStatus}>
+										<SelectTrigger className="h-8 w-44 text-xs">
+											<SelectValue placeholder="Set onboarding" />
+										</SelectTrigger>
+										<SelectContent>
+											{sellerOnboardingOptions.map(({ value, label }) => (
+												<SelectItem
+													key={value}
+													value={value}
+													className="text-xs">
+													{label}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+									<Select
+										value={bulkItemsOnboardingStatus}
+										onValueChange={setBulkItemsOnboardingStatus}>
+										<SelectTrigger className="h-8 w-44 text-xs">
+											<SelectValue placeholder="Set items status" />
+										</SelectTrigger>
+										<SelectContent>
+											{itemsOnboardingOptions.map(({ value, label }) => (
+												<SelectItem
+													key={value}
+													value={value}
+													className="text-xs">
+													{label}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+									<Button
+										size="sm"
+										className="h-8 text-xs"
+										disabled={
+											bulkLoading ||
+											(!bulkOnboardingStatus && !bulkItemsOnboardingStatus)
+										}
+										onClick={() => void handleBulkUpdate()}>
+										{bulkLoading ? "Updating..." : "Apply"}
+									</Button>
 								</>
 							)}
 						</div>
@@ -757,8 +849,12 @@ export default function SellersPage() {
 						setEscalationStatusSelectValue(
 							(seller.escalationStatus ?? "") || "__none__",
 						);
-						setOnboardingStatusSelectValue(seller.onboardingStatus || "initial_contact");
-						setItemsOnboardingStatusSelectValue(seller.itemsOnboardingStatus || "no_items");
+						setOnboardingStatusSelectValue(
+							seller.onboardingStatus || "initial_contact",
+						);
+						setItemsOnboardingStatusSelectValue(
+							seller.itemsOnboardingStatus || "no_items",
+						);
 						setShowForm(true);
 					}}
 					onDelete={(seller) => {
@@ -847,22 +943,33 @@ export default function SellersPage() {
 									{selectedSeller.consentGiven ? "Yes" : "No"}
 								</p>
 							</div>
-							{(selectedSeller.onboardingStatus || selectedSeller.itemsOnboardingStatus) && (
+							{(selectedSeller.onboardingStatus ||
+								selectedSeller.itemsOnboardingStatus) && (
 								<>
 									<div className="p-3 bg-muted/30 rounded-lg">
-										<span className="text-sm text-muted-foreground">Seller Onboarding</span>
+										<span className="text-sm text-muted-foreground">
+											Seller Onboarding
+										</span>
 										<div className="mt-1">
 											{selectedSeller.onboardingStatus ? (
 												<StatusBadge status={selectedSeller.onboardingStatus} />
-											) : <p className="text-sm">—</p>}
+											) : (
+												<p className="text-sm">—</p>
+											)}
 										</div>
 									</div>
 									<div className="p-3 bg-muted/30 rounded-lg">
-										<span className="text-sm text-muted-foreground">Items Onboarding</span>
+										<span className="text-sm text-muted-foreground">
+											Items Onboarding
+										</span>
 										<div className="mt-1">
 											{selectedSeller.itemsOnboardingStatus ? (
-												<StatusBadge status={selectedSeller.itemsOnboardingStatus} />
-											) : <p className="text-sm">—</p>}
+												<StatusBadge
+													status={selectedSeller.itemsOnboardingStatus}
+												/>
+											) : (
+												<p className="text-sm">—</p>
+											)}
 										</div>
 									</div>
 								</>
@@ -924,8 +1031,12 @@ export default function SellersPage() {
 								setEscalationStatusSelectValue(
 									(selectedSeller.escalationStatus ?? "") || "__none__",
 								);
-								setOnboardingStatusSelectValue(selectedSeller.onboardingStatus || "initial_contact");
-								setItemsOnboardingStatusSelectValue(selectedSeller.itemsOnboardingStatus || "no_items");
+								setOnboardingStatusSelectValue(
+									selectedSeller.onboardingStatus || "initial_contact",
+								);
+								setItemsOnboardingStatusSelectValue(
+									selectedSeller.itemsOnboardingStatus || "no_items",
+								);
 								setShowForm(true);
 								setSelectedSeller(null);
 							}}>
@@ -948,7 +1059,7 @@ export default function SellersPage() {
 					setUserSearch("");
 					setFormGovernorate("");
 					setFormCity("");
-								setFormIsDeactivated(false);
+					setFormIsDeactivated(false);
 					setEscalationStatusSelectValue("__none__");
 					setOnboardingStatusSelectValue("__none__");
 					setItemsOnboardingStatusSelectValue("__none__");
@@ -1158,24 +1269,36 @@ export default function SellersPage() {
 								</div>
 								<div className="space-y-2">
 									<Label>Seller Onboarding Status</Label>
-									<Select value={onboardingStatusSelectValue} onValueChange={setOnboardingStatusSelectValue}>
-										<SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+									<Select
+										value={onboardingStatusSelectValue}
+										onValueChange={setOnboardingStatusSelectValue}>
+										<SelectTrigger>
+											<SelectValue placeholder="None" />
+										</SelectTrigger>
 										<SelectContent>
 											<SelectItem value="__none__">None</SelectItem>
 											{sellerOnboardingOptions.map(({ value, label }) => (
-												<SelectItem key={value} value={value}>{label}</SelectItem>
+												<SelectItem key={value} value={value}>
+													{label}
+												</SelectItem>
 											))}
 										</SelectContent>
 									</Select>
 								</div>
 								<div className="space-y-2">
 									<Label>Items Onboarding Status</Label>
-									<Select value={itemsOnboardingStatusSelectValue} onValueChange={setItemsOnboardingStatusSelectValue}>
-										<SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+									<Select
+										value={itemsOnboardingStatusSelectValue}
+										onValueChange={setItemsOnboardingStatusSelectValue}>
+										<SelectTrigger>
+											<SelectValue placeholder="None" />
+										</SelectTrigger>
 										<SelectContent>
 											<SelectItem value="__none__">None</SelectItem>
 											{itemsOnboardingOptions.map(({ value, label }) => (
-												<SelectItem key={value} value={value}>{label}</SelectItem>
+												<SelectItem key={value} value={value}>
+													{label}
+												</SelectItem>
 											))}
 										</SelectContent>
 									</Select>

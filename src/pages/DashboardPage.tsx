@@ -1,11 +1,5 @@
 import { useCallback, useMemo } from "react";
-import {
-	ShoppingCart,
-	Users,
-	Package,
-	TrendingUp,
-	Store,
-} from "lucide-react";
+import { ShoppingCart, Users, Package, TrendingUp, Store } from "lucide-react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { KpiCard } from "@/components/dashboard/KpiCard";
@@ -373,10 +367,7 @@ export default function DashboardPage() {
 			const amount = Number(tx.amount ?? 0) || 0;
 			const orderId = getRefId(tx.order_id);
 			if (!orderId) return;
-			totalsByOrder.set(
-				orderId,
-				(totalsByOrder.get(orderId) ?? 0) + amount,
-			);
+			totalsByOrder.set(orderId, (totalsByOrder.get(orderId) ?? 0) + amount);
 		});
 		return [...orders]
 			.sort(
@@ -394,12 +385,20 @@ export default function DashboardPage() {
 							: "";
 				const user = usersById.get(userId);
 				const customer =
-					user?.emailAddress ?? user?.phoneNumber ??
+					user?.emailAddress ??
+					user?.phoneNumber ??
 					(typeof userRef === "string"
 						? userRef
 						: typeof userRef === "object" && userRef !== null
-							? ((userRef as { emailAddress?: string; phoneNumber?: string; _id?: string }).emailAddress ??
-								(userRef as { phoneNumber?: string; _id?: string }).phoneNumber ??
+							? ((
+									userRef as {
+										emailAddress?: string;
+										phoneNumber?: string;
+										_id?: string;
+									}
+								).emailAddress ??
+								(userRef as { phoneNumber?: string; _id?: string })
+									.phoneNumber ??
 								(userRef as { _id?: string })._id ??
 								"—")
 							: "—");
@@ -491,7 +490,9 @@ export default function DashboardPage() {
 						change={dashboardKpis.revenueChange}
 						trend="up"
 						format="currency"
-						icon={<span className="text-lg font-semibold text-primary">KD</span>}
+						icon={
+							<span className="text-lg font-semibold text-primary">KD</span>
+						}
 					/>
 					<KpiCard
 						title="Total Orders"

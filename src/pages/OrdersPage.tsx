@@ -16,7 +16,13 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import type { DiscountCode, Item, Order, OrderItem, User } from "@/types/models";
+import type {
+	DiscountCode,
+	Item,
+	Order,
+	OrderItem,
+	User,
+} from "@/types/models";
 import { DateTimePicker } from "@/components/ui/date-picker";
 import { Package, Calendar, User as UserIcon } from "lucide-react";
 import { restApi } from "@/lib/rest-client";
@@ -80,7 +86,8 @@ export default function OrdersPage() {
 	const { data: orderStatus } = useResourceList(loadOrderStatus);
 	const { data: users } = useResourceList<User>(loadUsers);
 	const { data: items } = useResourceList<Item>(loadItems);
-	const { data: discountCodes } = useResourceList<DiscountCode>(loadDiscountCodes);
+	const { data: discountCodes } =
+		useResourceList<DiscountCode>(loadDiscountCodes);
 	const userLabelById = useMemo(
 		() =>
 			new Map(
@@ -272,9 +279,7 @@ export default function OrdersPage() {
 		const matchesSearch =
 			search === "" ||
 			(order._id ?? "").toLowerCase().includes(search.toLowerCase()) ||
-			(orderUserId ?? "")
-				.toLowerCase()
-				.includes(search.toLowerCase()) ||
+			(orderUserId ?? "").toLowerCase().includes(search.toLowerCase()) ||
 			(customerLabel ?? "").toLowerCase().includes(search.toLowerCase());
 		const matchesStatus =
 			!filters.status ||
@@ -287,16 +292,31 @@ export default function OrdersPage() {
 	});
 
 	const allFilteredOrderIds = filteredOrders.map((o) => o._id);
-	const allOrdersSelected = allFilteredOrderIds.length > 0 && allFilteredOrderIds.every((id) => selectedIds.includes(id));
+	const allOrdersSelected =
+		allFilteredOrderIds.length > 0 &&
+		allFilteredOrderIds.every((id) => selectedIds.includes(id));
 
 	const columns: Column<Order>[] = [
 		{
 			key: "_select",
 			header: (
-				<Checkbox checked={allOrdersSelected} onCheckedChange={(v) => { if (v) setSelectedIds(allFilteredOrderIds); else setSelectedIds([]); }} />
+				<Checkbox
+					checked={allOrdersSelected}
+					onCheckedChange={(v) => {
+						if (v) setSelectedIds(allFilteredOrderIds);
+						else setSelectedIds([]);
+					}}
+				/>
 			),
 			render: (order) => (
-				<Checkbox checked={selectedIds.includes(order._id)} onCheckedChange={(v) => { setSelectedIds((prev) => v ? [...prev, order._id] : prev.filter((id) => id !== order._id)); }} />
+				<Checkbox
+					checked={selectedIds.includes(order._id)}
+					onCheckedChange={(v) => {
+						setSelectedIds((prev) =>
+							v ? [...prev, order._id] : prev.filter((id) => id !== order._id),
+						);
+					}}
+				/>
 			),
 		},
 		{
@@ -341,29 +361,41 @@ export default function OrdersPage() {
 		},
 	];
 
-
 	const handleBulkDelete = async () => {
 		if (!selectedIds.length) return;
 		setBulkLoading(true);
 		try {
 			await Promise.all(selectedIds.map((id) => restApi.orders.delete(id)));
-			setSelectedIds([]); await reload();
-		} catch (err) { console.error('Bulk delete failed', err); }
-		finally { setBulkLoading(false); }
+			setSelectedIds([]);
+			await reload();
+		} catch (err) {
+			console.error("Bulk delete failed", err);
+		} finally {
+			setBulkLoading(false);
+		}
 	};
 
 	const handleBulkUpdate = async () => {
-		if (!selectedIds.length || (!bulkOrderStatus && !bulkDeliveryStatus)) return;
+		if (!selectedIds.length || (!bulkOrderStatus && !bulkDeliveryStatus))
+			return;
 		setBulkLoading(true);
 		try {
 			const patch: Record<string, string> = {};
 			if (bulkOrderStatus) patch.order_status = bulkOrderStatus;
 			if (bulkDeliveryStatus) patch.deliveryStatus = bulkDeliveryStatus;
-			await Promise.all(selectedIds.map((id) => restApi.ordersExtra.patch(id, patch)));
-			setSelectedIds([]); setShowBulkUpdate(false); setBulkOrderStatus(""); setBulkDeliveryStatus("");
+			await Promise.all(
+				selectedIds.map((id) => restApi.ordersExtra.patch(id, patch)),
+			);
+			setSelectedIds([]);
+			setShowBulkUpdate(false);
+			setBulkOrderStatus("");
+			setBulkDeliveryStatus("");
 			await reload();
-		} catch (err) { console.error('Bulk update failed', err); }
-		finally { setBulkLoading(false); }
+		} catch (err) {
+			console.error("Bulk update failed", err);
+		} finally {
+			setBulkLoading(false);
+		}
 	};
 
 	const handleFilterChange = (key: string, value: string | undefined) => {
@@ -466,9 +498,7 @@ export default function OrdersPage() {
 
 		try {
 			if (editingOrder) {
-				const deliveryStatus = String(
-					formData.get("deliveryStatus") ?? "",
-				)
+				const deliveryStatus = String(formData.get("deliveryStatus") ?? "")
 					.trim()
 					.toLowerCase();
 				const trackingReference = String(
@@ -521,33 +551,30 @@ export default function OrdersPage() {
 					}
 					createdOrder = foundOrder;
 				}
-				const subtotal = selectedItems.reduce(
-					(sum, { item_id, quantity }) => {
-						const sel = orderItemSelections[item_id];
-						const qty = Math.max(1, Number(quantity) || 1);
-						const price = Number(sel?.price) || 0;
-						return sum + qty * price;
-					},
-					0,
-				);
-				
+				const subtotal = selectedItems.reduce((sum, { item_id, quantity }) => {
+					const sel = orderItemSelections[item_id];
+					const qty = Math.max(1, Number(quantity) || 1);
+					const price = Number(sel?.price) || 0;
+					return sum + qty * price;
+				}, 0);
+
 				// Get discount code if selected
 				const selectedDiscount = formDiscountId
 					? discountCodes?.find((dc) => dc._id === formDiscountId)
 					: null;
-				
+
 				// Calculate discount rate and final amount
 				const discountRate = selectedDiscount
 					? String(selectedDiscount.discount_percentage || "0")
 					: "0";
-				
+
 				const discountAmount =
 					selectedDiscount && Number(discountRate) > 0
 						? subtotal * (Number(discountRate) / 100)
 						: 0;
-				
+
 				const totalAmount = subtotal - discountAmount;
-				
+
 				await restApi.transactions.create({
 					order_id: createdOrder._id,
 					amount: String(Math.max(0, totalAmount)),
@@ -627,10 +654,12 @@ export default function OrdersPage() {
 							label: "Created By",
 							value: filters.user,
 							options: [
-								...Array.from(userLabelById.entries()).map(([userId, label]) => ({
-									value: userId,
-									label: label || userId,
-								})),
+								...Array.from(userLabelById.entries()).map(
+									([userId, label]) => ({
+										value: userId,
+										label: label || userId,
+									}),
+								),
 							],
 						},
 					]}
@@ -640,15 +669,74 @@ export default function OrdersPage() {
 
 				{selectedIds.length > 0 && (
 					<div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 mb-2">
-						<span className="text-xs font-medium text-muted-foreground">{selectedIds.length} selected</span>
+						<span className="text-xs font-medium text-muted-foreground">
+							{selectedIds.length} selected
+						</span>
 						<div className="flex flex-wrap items-center gap-2 ml-auto">
-							<Button variant="destructive" size="sm" className="h-8 text-xs" disabled={bulkLoading} onClick={() => void handleBulkDelete()}>Delete Selected</Button>
-							<Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setShowBulkUpdate((v) => !v)}>{showBulkUpdate ? "Cancel" : "Bulk Update"}</Button>
+							<Button
+								variant="destructive"
+								size="sm"
+								className="h-8 text-xs"
+								disabled={bulkLoading}
+								onClick={() => void handleBulkDelete()}>
+								Delete Selected
+							</Button>
+							<Button
+								variant="outline"
+								size="sm"
+								className="h-8 text-xs"
+								onClick={() => setShowBulkUpdate((v) => !v)}>
+								{showBulkUpdate ? "Cancel" : "Bulk Update"}
+							</Button>
 							{showBulkUpdate && (
 								<>
-									<Select value={bulkOrderStatus} onValueChange={setBulkOrderStatus}><SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Set status" /></SelectTrigger><SelectContent>{orderStatusOptions.map(({ value, label }) => (<SelectItem key={value} value={value} className="text-xs">{label}</SelectItem>))}</SelectContent></Select>
-									<Select value={bulkDeliveryStatus} onValueChange={setBulkDeliveryStatus}><SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Set delivery" /></SelectTrigger><SelectContent><SelectItem value="pending" className="text-xs">Pending</SelectItem><SelectItem value="shipped" className="text-xs">Shipped</SelectItem><SelectItem value="delivered" className="text-xs">Delivered</SelectItem><SelectItem value="failed" className="text-xs">Failed</SelectItem></SelectContent></Select>
-									<Button size="sm" className="h-8 text-xs" disabled={bulkLoading || (!bulkOrderStatus && !bulkDeliveryStatus)} onClick={() => void handleBulkUpdate()}>{bulkLoading ? "Updating..." : "Apply"}</Button>
+									<Select
+										value={bulkOrderStatus}
+										onValueChange={setBulkOrderStatus}>
+										<SelectTrigger className="h-8 w-40 text-xs">
+											<SelectValue placeholder="Set status" />
+										</SelectTrigger>
+										<SelectContent>
+											{orderStatusOptions.map(({ value, label }) => (
+												<SelectItem
+													key={value}
+													value={value}
+													className="text-xs">
+													{label}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+									<Select
+										value={bulkDeliveryStatus}
+										onValueChange={setBulkDeliveryStatus}>
+										<SelectTrigger className="h-8 w-40 text-xs">
+											<SelectValue placeholder="Set delivery" />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="pending" className="text-xs">
+												Pending
+											</SelectItem>
+											<SelectItem value="shipped" className="text-xs">
+												Shipped
+											</SelectItem>
+											<SelectItem value="delivered" className="text-xs">
+												Delivered
+											</SelectItem>
+											<SelectItem value="failed" className="text-xs">
+												Failed
+											</SelectItem>
+										</SelectContent>
+									</Select>
+									<Button
+										size="sm"
+										className="h-8 text-xs"
+										disabled={
+											bulkLoading || (!bulkOrderStatus && !bulkDeliveryStatus)
+										}
+										onClick={() => void handleBulkUpdate()}>
+										{bulkLoading ? "Updating..." : "Apply"}
+									</Button>
 								</>
 							)}
 						</div>
@@ -917,7 +1005,9 @@ export default function OrdersPage() {
 							</div>
 							<div className="border border-input rounded-md p-3 max-h-64 overflow-y-auto space-y-2 bg-background">
 								{displayItems.length === 0 && (
-									<p className="text-sm text-muted-foreground">No items found.</p>
+									<p className="text-sm text-muted-foreground">
+										No items found.
+									</p>
 								)}
 								{displayItems.map((item) => {
 									const selection = orderItemSelections[item._id] ?? {
@@ -1032,7 +1122,8 @@ export default function OrdersPage() {
 												const price = Number(value.price) || 0;
 												return sum + qty * price;
 											}, 0);
-										const discount = subtotal * (Number(selected.discount_percentage) / 100);
+										const discount =
+											subtotal * (Number(selected.discount_percentage) / 100);
 										const total = subtotal - discount;
 										return `Subtotal: KD ${subtotal.toFixed(2)} - Discount: KD ${discount.toFixed(2)} = Total: KD ${total.toFixed(2)}`;
 									})()}

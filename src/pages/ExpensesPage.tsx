@@ -60,38 +60,35 @@ export default function ExpensesPage() {
 	const employees = Array.isArray(employeesRaw) ? employeesRaw : [];
 	const { data: expenseTypes } = useResourceList(loadExpenseTypes);
 
-	const employeeLabelById = useMemo(
-		() => {
-			const map = new Map<string, string>();
-			for (const e of employees) {
-				if (!e || typeof e !== "object" || !e._id) continue;
-				
-				const id = String(e._id);
-				
-				// Extract name - must be a string, not an object
-				const nameStr = (e.name && typeof e.name === "string") ? e.name.trim() : "";
-				
-				// Extract role - must be a string, not an object
-				const roleStr = (e.role && typeof e.role === "string") ? e.role.trim() : "";
-				
-				// Create label prioritizing name
-				let label = "";
-				if (nameStr && roleStr) {
-					label = `${nameStr} · ${roleStr}`;
-				} else if (nameStr) {
-					label = nameStr;
-				} else if (roleStr) {
-					label = roleStr;
-				} else {
-					label = id; // Fallback to ID if no name/role
-				}
-				
-				map.set(id, label);
+	const employeeLabelById = useMemo(() => {
+		const map = new Map<string, string>();
+		for (const e of employees) {
+			if (!e || typeof e !== "object" || !e._id) continue;
+
+			const id = String(e._id);
+
+			// Extract name - must be a string, not an object
+			const nameStr = e.name && typeof e.name === "string" ? e.name.trim() : "";
+
+			// Extract role - must be a string, not an object
+			const roleStr = e.role && typeof e.role === "string" ? e.role.trim() : "";
+
+			// Create label prioritizing name
+			let label = "";
+			if (nameStr && roleStr) {
+				label = `${nameStr} · ${roleStr}`;
+			} else if (nameStr) {
+				label = nameStr;
+			} else if (roleStr) {
+				label = roleStr;
+			} else {
+				label = id; // Fallback to ID if no name/role
 			}
-			return map;
-		},
-		[employees],
-	);
+
+			map.set(id, label);
+		}
+		return map;
+	}, [employees]);
 	const expenseTypeValues = getEnumValues("expenseType", expenseTypes);
 	const expenseTypeOptions =
 		expenseTypeValues.length > 0
@@ -162,42 +159,62 @@ export default function ExpensesPage() {
 				if (!e.employee_id) {
 					return <span className="text-sm text-muted-foreground">—</span>;
 				}
-				
+
 				// If employee_id is a populated Employee object, use it directly
 				if (typeof e.employee_id === "object" && e.employee_id !== null) {
-					const empObj = e.employee_id as { _id?: string; name?: string; role?: string };
-					
+					const empObj = e.employee_id as {
+						_id?: string;
+						name?: string;
+						role?: string;
+					};
+
 					// Extract name and role as strings
-					const nameStr = empObj.name && typeof empObj.name === "string" ? empObj.name.trim() : "";
-					const roleStr = empObj.role && typeof empObj.role === "string" ? empObj.role.trim() : "";
-					
+					const nameStr =
+						empObj.name && typeof empObj.name === "string"
+							? empObj.name.trim()
+							: "";
+					const roleStr =
+						empObj.role && typeof empObj.role === "string"
+							? empObj.role.trim()
+							: "";
+
 					// Show name if available, with role if both exist
 					if (nameStr) {
 						const display = roleStr ? `${nameStr} · ${roleStr}` : nameStr;
-						return <span className="text-sm text-muted-foreground">{display}</span>;
+						return (
+							<span className="text-sm text-muted-foreground">{display}</span>
+						);
 					}
-					
+
 					// Fallback: try to get from map using _id
 					if (empObj._id) {
 						const label = employeeLabelById.get(String(empObj._id));
 						if (label && typeof label === "string" && label) {
-							return <span className="text-sm text-muted-foreground">{label}</span>;
+							return (
+								<span className="text-sm text-muted-foreground">{label}</span>
+							);
 						}
 					}
-					
+
 					return <span className="text-sm text-muted-foreground">—</span>;
 				}
-				
+
 				// If employee_id is a string, look it up in the map
 				if (typeof e.employee_id === "string") {
 					const label = employeeLabelById.get(e.employee_id);
 					if (label && typeof label === "string" && label) {
-						return <span className="text-sm text-muted-foreground">{label}</span>;
+						return (
+							<span className="text-sm text-muted-foreground">{label}</span>
+						);
 					}
 					// Fallback to showing the ID if not found in map
-					return <span className="text-sm text-muted-foreground">{e.employee_id}</span>;
+					return (
+						<span className="text-sm text-muted-foreground">
+							{e.employee_id}
+						</span>
+					);
 				}
-				
+
 				return <span className="text-sm text-muted-foreground">—</span>;
 			},
 		},
@@ -210,7 +227,7 @@ export default function ExpensesPage() {
 						? new Date(e.month).toLocaleDateString("en-US", {
 								month: "short",
 								year: "numeric",
-						  })
+							})
 						: "—"}
 				</span>
 			),
@@ -378,7 +395,10 @@ export default function ExpensesPage() {
 						if (e.employee_id) {
 							if (typeof e.employee_id === "string") {
 								employeeIdStr = e.employee_id;
-							} else if (typeof e.employee_id === "object" && e.employee_id !== null) {
+							} else if (
+								typeof e.employee_id === "object" &&
+								e.employee_id !== null
+							) {
 								const empObj = e.employee_id as { _id?: string };
 								employeeIdStr = empObj._id ? String(empObj._id) : "";
 							}
@@ -388,7 +408,9 @@ export default function ExpensesPage() {
 						setFormPaidBy(e.paidBy ?? "");
 						setFormRecurring(e.isRecurring ?? false);
 						setFormPhase(e.phase ?? "");
-						setFormType(Array.isArray(e.type) ? (e.type[0] ?? "") : e.type ?? "");
+						setFormType(
+							Array.isArray(e.type) ? (e.type[0] ?? "") : (e.type ?? ""),
+						);
 						setFormError(null);
 						setShowForm(true);
 					}}
@@ -423,34 +445,53 @@ export default function ExpensesPage() {
 								<p className="text-sm">
 									{(() => {
 										if (!selectedExpense.employee_id) return "—";
-										
+
 										// Handle string ID
 										if (typeof selectedExpense.employee_id === "string") {
-											const label = employeeLabelById.get(selectedExpense.employee_id);
-											return typeof label === "string" && label ? label : selectedExpense.employee_id;
+											const label = employeeLabelById.get(
+												selectedExpense.employee_id,
+											);
+											return typeof label === "string" && label
+												? label
+												: selectedExpense.employee_id;
 										}
-										
+
 										// Handle populated Employee object
-										if (selectedExpense.employee_id && typeof selectedExpense.employee_id === "object") {
-											const empObj = selectedExpense.employee_id as { _id?: string; name?: string; role?: string };
-											
+										if (
+											selectedExpense.employee_id &&
+											typeof selectedExpense.employee_id === "object"
+										) {
+											const empObj = selectedExpense.employee_id as {
+												_id?: string;
+												name?: string;
+												role?: string;
+											};
+
 											// Try to get name/role from the object
 											if (empObj.name || empObj.role) {
-												const nameStr = empObj.name && typeof empObj.name === "string" ? empObj.name.trim() : "";
-												const roleStr = empObj.role && typeof empObj.role === "string" ? empObj.role.trim() : "";
+												const nameStr =
+													empObj.name && typeof empObj.name === "string"
+														? empObj.name.trim()
+														: "";
+												const roleStr =
+													empObj.role && typeof empObj.role === "string"
+														? empObj.role.trim()
+														: "";
 												const parts = [nameStr, roleStr].filter(Boolean);
 												if (parts.length > 0) {
 													return parts.join(" · ");
 												}
 											}
-											
+
 											// Fallback to looking up by _id
 											if (empObj._id) {
 												const label = employeeLabelById.get(String(empObj._id));
-												return typeof label === "string" && label ? label : String(empObj._id);
+												return typeof label === "string" && label
+													? label
+													: String(empObj._id);
 											}
 										}
-										
+
 										return "—";
 									})()}
 								</p>
@@ -468,7 +509,7 @@ export default function ExpensesPage() {
 										? new Date(selectedExpense.month).toLocaleDateString(
 												"en-US",
 												{ month: "short", year: "numeric" },
-										  )
+											)
 										: "—"}
 								</p>
 							</div>
@@ -511,8 +552,13 @@ export default function ExpensesPage() {
 								if (selectedExpense.employee_id) {
 									if (typeof selectedExpense.employee_id === "string") {
 										employeeIdStr = selectedExpense.employee_id;
-									} else if (typeof selectedExpense.employee_id === "object" && selectedExpense.employee_id !== null) {
-										const empObj = selectedExpense.employee_id as { _id?: string };
+									} else if (
+										typeof selectedExpense.employee_id === "object" &&
+										selectedExpense.employee_id !== null
+									) {
+										const empObj = selectedExpense.employee_id as {
+											_id?: string;
+										};
 										employeeIdStr = empObj._id ? String(empObj._id) : "";
 									}
 								}
@@ -524,7 +570,7 @@ export default function ExpensesPage() {
 								setFormType(
 									Array.isArray(selectedExpense.type)
 										? (selectedExpense.type[0] ?? "")
-										: selectedExpense.type ?? "",
+										: (selectedExpense.type ?? ""),
 								);
 								setSelectedExpense(null);
 								setShowForm(true);
@@ -593,9 +639,7 @@ export default function ExpensesPage() {
 					<div className="space-y-2">
 						<Label>Employee</Label>
 						<Select
-							value={
-								formEmployeeId || "__none__"
-							}
+							value={formEmployeeId || "__none__"}
 							onValueChange={(v) =>
 								setFormEmployeeId(v === "__none__" ? "" : v)
 							}>
@@ -608,11 +652,12 @@ export default function ExpensesPage() {
 									if (!e || typeof e !== "object" || !e._id) return null;
 									const employeeId = String(e._id);
 									const label = employeeLabelById.get(employeeId);
-									const displayText = typeof label === "string" && label ? label : employeeId;
+									const displayText =
+										typeof label === "string" && label ? label : employeeId;
 									return (
 										<SelectItem key={employeeId} value={employeeId}>
 											{displayText}
-									</SelectItem>
+										</SelectItem>
 									);
 								})}
 							</SelectContent>

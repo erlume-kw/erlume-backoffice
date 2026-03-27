@@ -190,15 +190,6 @@ export default function OutfitItemsPage() {
 		}
 	};
 
-	const filteredOutfitItems = outfitItems.filter((outfitItem) => {
-		const query = search.toLowerCase();
-		return (
-			search === "" ||
-			(outfitItem.outfit_id ?? "").toLowerCase().includes(query) ||
-			(outfitItem.item_id ?? "").toLowerCase().includes(query)
-		);
-	});
-
 	const handleDelete = async (id: string) => {
 		try {
 			await restApi.outfititems.delete(id);

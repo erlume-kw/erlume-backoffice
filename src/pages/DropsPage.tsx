@@ -179,7 +179,9 @@ export default function DropsPage() {
 		if (!selectedIds.length) return;
 		setBulkLoading(true);
 		try {
-			await Promise.all(selectedIds.map((id) => restApi.drops.delete(id)));
+			await Promise.all(
+				selectedIds.map((id) => restApi.dropsExtra.delete(id, { removeItems: true })),
+			);
 			setSelectedIds([]); await reload();
 		} catch (err) { console.error("Bulk delete failed", err); }
 		finally { setBulkLoading(false); }
@@ -202,7 +204,7 @@ export default function DropsPage() {
 
 	const handleDelete = async (id: string) => {
 		try {
-			await restApi.drops.delete(id);
+			await restApi.dropsExtra.delete(id, { removeItems: true });
 			await reload();
 		} catch (err) {
 			console.error("Failed to delete drop", err);

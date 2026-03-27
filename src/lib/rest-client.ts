@@ -425,6 +425,12 @@ export const restApi = {
 			apiRequest(`${endpoints.drops}/${id}/items/${itemId}`, {
 				method: "DELETE",
 			}),
+		/** DELETE /api/drops/:id?removeItems=true — unlink items then delete drop */
+		delete: (id: string, options?: { removeItems?: boolean }) =>
+			apiRequest<void>(
+				`${endpoints.drops}/${id}${options?.removeItems ? "?removeItems=true" : ""}`,
+				{ method: "DELETE" },
+			),
 	},
 };
 

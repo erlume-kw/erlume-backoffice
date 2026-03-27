@@ -20,7 +20,9 @@ import { useResourceList } from "@/hooks/use-resource-list";
 
 export default function EmployeesPage() {
 	const [search, setSearch] = useState("");
-	const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+	const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(
+		null,
+	);
 	const [showForm, setShowForm] = useState(false);
 	const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
 	const [formUserId, setFormUserId] = useState("");
@@ -56,7 +58,12 @@ export default function EmployeesPage() {
 		() => restApi.users.getAll() as Promise<User[]>,
 		[],
 	);
-	const { data: employees, loading, error, reload } = useResourceList(loadEmployees);
+	const {
+		data: employees,
+		loading,
+		error,
+		reload,
+	} = useResourceList(loadEmployees);
 	const { data: users } = useResourceList(loadUsers);
 
 	const safeEmployees = Array.isArray(employees) ? employees : [];
@@ -117,12 +124,16 @@ export default function EmployeesPage() {
 		{
 			key: "role",
 			header: "Role",
-			render: (e) => <span className="text-muted-foreground">{e.role || "—"}</span>,
+			render: (e) => (
+				<span className="text-muted-foreground">{e.role || "—"}</span>
+			),
 		},
 		{
 			key: "type",
 			header: "Type",
-			render: (e) => <span className="text-muted-foreground">{e.type || "—"}</span>,
+			render: (e) => (
+				<span className="text-muted-foreground">{e.type || "—"}</span>
+			),
 		},
 		{
 			key: "salaryActual",
@@ -135,7 +146,9 @@ export default function EmployeesPage() {
 			key: "salaryProjected",
 			header: "Projected Salary",
 			render: (e) => (
-				<span className="text-muted-foreground">{e.salaryProjected || "—"}</span>
+				<span className="text-muted-foreground">
+					{e.salaryProjected || "—"}
+				</span>
 			),
 		},
 	];
@@ -159,7 +172,9 @@ export default function EmployeesPage() {
 			await restApi.employees.delete(id);
 			await reload();
 		} catch (err) {
-			setFormError(err instanceof Error ? err.message : "Failed to delete employee");
+			setFormError(
+				err instanceof Error ? err.message : "Failed to delete employee",
+			);
 		}
 	};
 
@@ -172,7 +187,9 @@ export default function EmployeesPage() {
 		const role = String(formData.get("role") ?? "").trim();
 		const type = formType.trim();
 		const salaryActual = String(formData.get("salaryActual") ?? "").trim();
-		const salaryProjected = String(formData.get("salaryProjected") ?? "").trim();
+		const salaryProjected = String(
+			formData.get("salaryProjected") ?? "",
+		).trim();
 
 		if (!name) {
 			setFormError("Name is required.");
@@ -202,7 +219,9 @@ export default function EmployeesPage() {
 			setEditingEmployee(null);
 			setFormUserId("");
 		} catch (err) {
-			setFormError(err instanceof Error ? err.message : "Failed to save employee");
+			setFormError(
+				err instanceof Error ? err.message : "Failed to save employee",
+			);
 		}
 	};
 
@@ -318,7 +337,9 @@ export default function EmployeesPage() {
 				type="dialog"
 				size="md">
 				<form className="space-y-4" onSubmit={handleSubmit}>
-					{formError && <div className="text-sm text-destructive">{formError}</div>}
+					{formError && (
+						<div className="text-sm text-destructive">{formError}</div>
+					)}
 					<div className="space-y-2">
 						<Label htmlFor="name">Name *</Label>
 						<Input
@@ -330,7 +351,11 @@ export default function EmployeesPage() {
 					</div>
 					<div className="space-y-2">
 						<Label htmlFor="role">Role</Label>
-						<Input id="role" name="role" defaultValue={editingEmployee?.role ?? ""} />
+						<Input
+							id="role"
+							name="role"
+							defaultValue={editingEmployee?.role ?? ""}
+						/>
 					</div>
 					<div className="space-y-2">
 						<Label>Type</Label>
