@@ -25,6 +25,8 @@ export default function CategoriesPage() {
 	const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
 	const [editingCategory, setEditingCategory] = useState<Category | null>(null);
 	const [formSubCategoryIds, setFormSubCategoryIds] = useState<string[]>([]);
+	const [selectedIds, setSelectedIds] = useState<string[]>([]);
+	const [bulkLoading, setBulkLoading] = useState(false);
 	const loadCategories = useCallback(() => restApi.categories.getAll(), []);
 	const loadSubCategories = useCallback(
 		() => restApi.subcategories.getAll() as Promise<SubCategory[]>,
@@ -49,7 +51,41 @@ export default function CategoriesPage() {
 		return subcategories.filter((sub) => sub.category_id === editingCategory._id);
 	}, [subcategories, editingCategory]);
 
+	const filteredCategories = categories.filter((cat) => {
+		return (
+			search === "" ||
+			(cat.name ?? "").toLowerCase().includes(search.toLowerCase())
+		);
+	});
+
+	const allFilteredIds = filteredCategories.map((c) => c._id);
+	const allSelected =
+		allFilteredIds.length > 0 &&
+		allFilteredIds.every((id) => selectedIds.includes(id));
+
 	const columns: Column<Category>[] = [
+		{
+			key: "_select",
+			header: (
+				<Checkbox
+					checked={allSelected}
+					onCheckedChange={(v) => {
+						if (v) setSelectedIds(allFilteredIds);
+						else setSelectedIds([]);
+					}}
+				/>
+			),
+			render: (cat) => (
+				<Checkbox
+					checked={selectedIds.includes(cat._id)}
+					onCheckedChange={(v) => {
+						setSelectedIds((prev) =>
+							v ? [...prev, cat._id] : prev.filter((id) => id !== cat._id),
+						);
+					}}
+				/>
+			),
+		},
 		{
 			key: "name",
 			header: "Category",
@@ -107,19 +143,26 @@ export default function CategoriesPage() {
 		},
 	];
 
-	const filteredCategories = categories.filter((cat) => {
-		return (
-			search === "" ||
-			(cat.name ?? "").toLowerCase().includes(search.toLowerCase())
-		);
-	});
-
 	const handleDelete = async (id: string) => {
 		try {
 			await restApi.categories.delete(id);
 			await reload();
 		} catch (err) {
 			console.error("Failed to delete category", err);
+		}
+	};
+
+	const handleBulkDelete = async () => {
+		if (!selectedIds.length) return;
+		setBulkLoading(true);
+		try {
+			await Promise.all(selectedIds.map((id) => restApi.categories.delete(id)));
+			setSelectedIds([]);
+			await reload();
+		} catch (err) {
+			console.error("Bulk delete failed", err);
+		} finally {
+			setBulkLoading(false);
 		}
 	};
 
@@ -182,6 +225,23 @@ export default function CategoriesPage() {
 					<div className="text-sm text-muted-foreground mb-3">
 						{loading ? "Loading categories..." : ""}
 						{error ? ` ${error}` : ""}
+					</div>
+				)}
+				{selectedIds.length > 0 && (
+					<div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 mb-2">
+						<span className="text-xs font-medium text-muted-foreground">
+							{selectedIds.length} selected
+						</span>
+						<div className="ml-auto">
+							<Button
+								variant="destructive"
+								size="sm"
+								className="h-8 text-xs"
+								disabled={bulkLoading}
+								onClick={() => void handleBulkDelete()}>
+								Delete Selected
+							</Button>
+						</div>
 					</div>
 				)}
 				<DataTable

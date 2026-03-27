@@ -1,9 +1,10 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, Column } from "@/components/common/DataTable";
 import { DetailPanel } from "@/components/common/DetailPanel";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { CreditCard } from "@/types/models";
@@ -16,6 +17,8 @@ export default function CreditCardsPage() {
 	const [selectedCard, setSelectedCard] = useState<CreditCard | null>(null);
 	const [showForm, setShowForm] = useState(false);
 	const [editingCard, setEditingCard] = useState<CreditCard | null>(null);
+	const [selectedIds, setSelectedIds] = useState<string[]>([]);
+	const [bulkLoading, setBulkLoading] = useState(false);
 	const loadCards = useCallback(() => restApi.creditcards.getAll(), []);
 	const { data: cards, loading, error, reload } = useResourceList(loadCards);
 
@@ -27,7 +30,46 @@ export default function CreditCardsPage() {
 		return `•••• •••• •••• ${last4}`;
 	};
 
+	const filteredCards = useMemo(() => {
+		const list = Array.isArray(cards) ? cards : [];
+		const query = search.toLowerCase();
+		return list.filter((card) => {
+			return (
+				search === "" ||
+				(card.holderName ?? "").toLowerCase().includes(query) ||
+				(card.cardNumber ?? "").toLowerCase().includes(query)
+			);
+		});
+	}, [cards, search]);
+
+	const allFilteredIds = filteredCards.map((c) => c._id);
+	const allSelected =
+		allFilteredIds.length > 0 &&
+		allFilteredIds.every((id) => selectedIds.includes(id));
+
 	const columns: Column<CreditCard>[] = [
+		{
+			key: "_select",
+			header: (
+				<Checkbox
+					checked={allSelected}
+					onCheckedChange={(v) => {
+						if (v) setSelectedIds(allFilteredIds);
+						else setSelectedIds([]);
+					}}
+				/>
+			),
+			render: (card) => (
+				<Checkbox
+					checked={selectedIds.includes(card._id)}
+					onCheckedChange={(v) => {
+						setSelectedIds((prev) =>
+							v ? [...prev, card._id] : prev.filter((id) => id !== card._id),
+						);
+					}}
+				/>
+			),
+		},
 		{
 			key: "cardNumber",
 			header: "Card",
@@ -54,14 +96,19 @@ export default function CreditCardsPage() {
 		},
 	];
 
-	const filteredCards = cards.filter((card) => {
-		const query = search.toLowerCase();
-		return (
-			search === "" ||
-			(card.holderName ?? "").toLowerCase().includes(query) ||
-			(card.cardNumber ?? "").toLowerCase().includes(query)
-		);
-	});
+	const handleBulkDelete = async () => {
+		if (!selectedIds.length) return;
+		setBulkLoading(true);
+		try {
+			await Promise.all(selectedIds.map((id) => restApi.creditcards.delete(id)));
+			setSelectedIds([]);
+			await reload();
+		} catch (err) {
+			console.error("Bulk delete failed", err);
+		} finally {
+			setBulkLoading(false);
+		}
+	};
 
 	const handleDelete = async (id: string) => {
 		try {
@@ -115,6 +162,23 @@ export default function CreditCardsPage() {
 					<div className="text-sm text-muted-foreground">
 						{loading ? "Loading credit cards..." : ""}
 						{error ? ` ${error}` : ""}
+					</div>
+				)}
+				{selectedIds.length > 0 && (
+					<div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 mb-2">
+						<span className="text-xs font-medium text-muted-foreground">
+							{selectedIds.length} selected
+						</span>
+						<div className="ml-auto">
+							<Button
+								variant="destructive"
+								size="sm"
+								className="h-8 text-xs"
+								disabled={bulkLoading}
+								onClick={() => void handleBulkDelete()}>
+								Delete Selected
+							</Button>
+						</div>
 					</div>
 				)}
 				<DataTable

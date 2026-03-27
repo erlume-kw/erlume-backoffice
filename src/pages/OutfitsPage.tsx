@@ -19,6 +19,8 @@ export default function OutfitsPage() {
 	const [editingOutfit, setEditingOutfit] = useState<Outfit | null>(null);
 	const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
 	const [itemSearch, setItemSearch] = useState("");
+	const [selectedIds, setSelectedIds] = useState<string[]>([]);
+	const [bulkLoading, setBulkLoading] = useState(false);
 	const loadOutfits = useCallback(() => restApi.outfits.getAll(), []);
 	const loadItems = useCallback(
 		() => restApi.items.getAll() as Promise<Item[]>,
@@ -61,6 +63,31 @@ export default function OutfitsPage() {
 
 	const columns: Column<Outfit>[] = [
 		{
+			key: "_select",
+			header: (
+				<Checkbox
+					checked={
+						filteredOutfits.length > 0 &&
+						filteredOutfits.every((o) => selectedIds.includes(o._id))
+					}
+					onCheckedChange={(v) => {
+						if (v) setSelectedIds(filteredOutfits.map((o) => o._id));
+						else setSelectedIds([]);
+					}}
+				/>
+			),
+			render: (outfit) => (
+				<Checkbox
+					checked={selectedIds.includes(outfit._id)}
+					onCheckedChange={(v) => {
+						setSelectedIds((prev) =>
+							v ? [...prev, outfit._id] : prev.filter((id) => id !== outfit._id),
+						);
+					}}
+				/>
+			),
+		},
+		{
 			key: "outfit_title",
 			header: "Outfit",
 			render: (outfit) => (
@@ -101,6 +128,20 @@ export default function OutfitsPage() {
 			await reload();
 		} catch (err) {
 			console.error("Failed to delete outfit", err);
+		}
+	};
+
+	const handleBulkDelete = async () => {
+		if (!selectedIds.length) return;
+		setBulkLoading(true);
+		try {
+			await Promise.all(selectedIds.map((id) => restApi.outfits.delete(id)));
+			setSelectedIds([]);
+			await reload();
+		} catch (err) {
+			console.error("Bulk delete failed", err);
+		} finally {
+			setBulkLoading(false);
 		}
 	};
 
@@ -156,6 +197,23 @@ export default function OutfitsPage() {
 					<div className="text-sm text-muted-foreground mb-3">
 						{loading ? "Loading outfits..." : ""}
 						{error ? ` ${error}` : ""}
+					</div>
+				)}
+				{selectedIds.length > 0 && (
+					<div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 mb-2">
+						<span className="text-xs font-medium text-muted-foreground">
+							{selectedIds.length} selected
+						</span>
+						<div className="ml-auto">
+							<Button
+								variant="destructive"
+								size="sm"
+								className="h-8 text-xs"
+								disabled={bulkLoading}
+								onClick={() => void handleBulkDelete()}>
+								Delete Selected
+							</Button>
+						</div>
 					</div>
 				)}
 				<DataTable

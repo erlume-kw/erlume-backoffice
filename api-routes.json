@@ -328,17 +328,17 @@
       ]
     },
     "orderItems": {
-      "basePath": "/api/order-items",
+      "basePath": "/api/orderitems",
       "endpoints": [
         {
           "method": "GET",
-          "path": "/api/order-items",
+          "path": "/api/orderitems",
           "description": "List all order items",
           "response": "Array of OrderItem objects"
         },
         {
           "method": "GET",
-          "path": "/api/order-items/order/:orderId",
+          "path": "/api/orderitems/order/:orderId",
           "description": "Get order items by order ID",
           "params": {
             "orderId": "ObjectId (required)"
@@ -347,7 +347,7 @@
         },
         {
           "method": "GET",
-          "path": "/api/order-items/:id",
+          "path": "/api/orderitems/:id",
           "description": "Get order item by ID",
           "params": {
             "id": "ObjectId (required)"
@@ -356,7 +356,7 @@
         },
         {
           "method": "POST",
-          "path": "/api/order-items",
+          "path": "/api/orderitems",
           "description": "Create order item",
           "body": {
             "order_id": "ObjectId (required)",
@@ -369,7 +369,7 @@
         },
         {
           "method": "PUT",
-          "path": "/api/order-items/:id",
+          "path": "/api/orderitems/:id",
           "description": "Update order item",
           "params": {
             "id": "ObjectId (required)"
@@ -379,7 +379,7 @@
         },
         {
           "method": "DELETE",
-          "path": "/api/order-items/:id",
+          "path": "/api/orderitems/:id",
           "description": "Delete order item",
           "params": {
             "id": "ObjectId (required)"
@@ -388,7 +388,7 @@
         },
         {
           "method": "PATCH",
-          "path": "/api/order-items/:id/return",
+          "path": "/api/orderitems/:id/return",
           "description": "Mark order item as returned",
           "params": {
             "id": "ObjectId (required)"
@@ -1081,17 +1081,17 @@
       ]
     },
     "creditCards": {
-      "basePath": "/api/credit-cards",
+      "basePath": "/api/creditcards",
       "endpoints": [
         {
           "method": "GET",
-          "path": "/api/credit-cards",
+          "path": "/api/creditcards",
           "description": "List all credit cards",
           "response": "Array of CreditCard objects"
         },
         {
           "method": "GET",
-          "path": "/api/credit-cards/user/:userId",
+          "path": "/api/creditcards/user/:userId",
           "description": "Get credit cards by user ID",
           "params": {
             "userId": "ObjectId (required)"
@@ -1100,7 +1100,7 @@
         },
         {
           "method": "GET",
-          "path": "/api/credit-cards/:id",
+          "path": "/api/creditcards/:id",
           "description": "Get credit card by ID",
           "params": {
             "id": "ObjectId (required)"
@@ -1109,7 +1109,7 @@
         },
         {
           "method": "POST",
-          "path": "/api/credit-cards",
+          "path": "/api/creditcards",
           "description": "Create credit card",
           "body": {
             "cardNumber": "string (required)",
@@ -1120,7 +1120,7 @@
         },
         {
           "method": "PUT",
-          "path": "/api/credit-cards/:id",
+          "path": "/api/creditcards/:id",
           "description": "Update credit card",
           "params": {
             "id": "ObjectId (required)"
@@ -1130,7 +1130,7 @@
         },
         {
           "method": "DELETE",
-          "path": "/api/credit-cards/:id",
+          "path": "/api/creditcards/:id",
           "description": "Delete credit card",
           "params": {
             "id": "ObjectId (required)"
@@ -1190,17 +1190,17 @@
       ]
     },
     "outfitItems": {
-      "basePath": "/api/outfit-items",
+      "basePath": "/api/outfititems",
       "endpoints": [
         {
           "method": "GET",
-          "path": "/api/outfit-items",
+          "path": "/api/outfititems",
           "description": "List all outfit items",
           "response": "Array of OutfitItem objects"
         },
         {
           "method": "GET",
-          "path": "/api/outfit-items/outfit/:outfitId",
+          "path": "/api/outfititems/outfit/:outfitId",
           "description": "Get outfit items by outfit ID",
           "params": {
             "outfitId": "ObjectId (required)"
@@ -1209,7 +1209,7 @@
         },
         {
           "method": "GET",
-          "path": "/api/outfit-items/:id",
+          "path": "/api/outfititems/:id",
           "description": "Get outfit item by ID",
           "params": {
             "id": "ObjectId (required)"
@@ -1218,7 +1218,7 @@
         },
         {
           "method": "POST",
-          "path": "/api/outfit-items",
+          "path": "/api/outfititems",
           "description": "Create outfit item",
           "body": {
             "item_id": "ObjectId (required)",
@@ -1229,7 +1229,7 @@
         },
         {
           "method": "PUT",
-          "path": "/api/outfit-items/:id",
+          "path": "/api/outfititems/:id",
           "description": "Update outfit item",
           "params": {
             "id": "ObjectId (required)"
@@ -1239,7 +1239,7 @@
         },
         {
           "method": "DELETE",
-          "path": "/api/outfit-items/:id",
+          "path": "/api/outfititems/:id",
           "description": "Delete outfit item",
           "params": {
             "id": "ObjectId (required)"
@@ -1248,7 +1248,7 @@
         },
         {
           "method": "PATCH",
-          "path": "/api/outfit-items/:id/featured",
+          "path": "/api/outfititems/:id/featured",
           "description": "Toggle featured status of outfit item",
           "params": {
             "id": "ObjectId (required)"

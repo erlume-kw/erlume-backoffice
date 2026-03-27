@@ -5,6 +5,7 @@ import { DataTable, Column } from "@/components/common/DataTable";
 import { DetailPanel } from "@/components/common/DetailPanel";
 import { FilterBar } from "@/components/common/FilterBar";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -73,6 +74,8 @@ export default function SalesPage() {
 	const [formSaleDate, setFormSaleDate] = useState("");
 	const [formBagRecord, setFormBagRecord] = useState("");
 	const [formError, setFormError] = useState<string | null>(null);
+	const [selectedIds, setSelectedIds] = useState<string[]>([]);
+	const [bulkLoading, setBulkLoading] = useState(false);
 
 	const loadSales = useCallback(() => {
 		if (filters.orderId) {
@@ -236,7 +239,44 @@ export default function SalesPage() {
 		return map;
 	}, [safeOrderItems]);
 
+	const filteredSales = useMemo(() => {
+		if (!search.trim()) return safeSales;
+		const q = search.toLowerCase();
+		return safeSales.filter(
+			(s) =>
+				getRefId(s.order_id).toLowerCase().includes(q) ||
+				(s.invoice_number ?? "").toLowerCase().includes(q) ||
+				(s.buyer ?? "").toLowerCase().includes(q) ||
+				(s.bag_record ?? "").toLowerCase().includes(q),
+		);
+	}, [safeSales, search]);
+
 	const columns: Column<Sale>[] = [
+		{
+			key: "_select",
+			header: (
+				<Checkbox
+					checked={
+						filteredSales.length > 0 &&
+						filteredSales.every((s) => selectedIds.includes(s._id))
+					}
+					onCheckedChange={(v) => {
+						if (v) setSelectedIds(filteredSales.map((s) => s._id));
+						else setSelectedIds([]);
+					}}
+				/>
+			),
+			render: (s) => (
+				<Checkbox
+					checked={selectedIds.includes(s._id)}
+					onCheckedChange={(v) => {
+						setSelectedIds((prev) =>
+							v ? [...prev, s._id] : prev.filter((id) => id !== s._id),
+						);
+					}}
+				/>
+			),
+		},
 		{
 			key: "order_id",
 			header: "Order",
@@ -296,20 +336,22 @@ export default function SalesPage() {
 		},
 	];
 
-	const filteredSales = useMemo(() => {
-		if (!search.trim()) return safeSales;
-		const q = search.toLowerCase();
-		return safeSales.filter(
-			(s) =>
-				getRefId(s.order_id).toLowerCase().includes(q) ||
-				(s.invoice_number ?? "").toLowerCase().includes(q) ||
-				(s.buyer ?? "").toLowerCase().includes(q) ||
-				(s.bag_record ?? "").toLowerCase().includes(q),
-		);
-	}, [safeSales, search]);
-
 	const handleFilterChange = (key: string, value: string | undefined) => {
 		setFilters((prev) => ({ ...prev, [key]: value }));
+	};
+
+	const handleBulkDelete = async () => {
+		if (!selectedIds.length) return;
+		setBulkLoading(true);
+		try {
+			await Promise.all(selectedIds.map((id) => restApi.sales.delete(id)));
+			setSelectedIds([]);
+			await reload();
+		} catch (err) {
+			console.error("Bulk delete failed", err);
+		} finally {
+			setBulkLoading(false);
+		}
 	};
 
 	const handleDelete = async (id: string) => {
@@ -463,6 +505,23 @@ export default function SalesPage() {
 					onFilterChange={handleFilterChange}
 					onClearAll={() => setFilters({})}
 				/>
+				{selectedIds.length > 0 && (
+					<div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 mb-2">
+						<span className="text-xs font-medium text-muted-foreground">
+							{selectedIds.length} selected
+						</span>
+						<div className="ml-auto">
+							<Button
+								variant="destructive"
+								size="sm"
+								className="h-8 text-xs"
+								disabled={bulkLoading}
+								onClick={() => void handleBulkDelete()}>
+								Delete Selected
+							</Button>
+						</div>
+					</div>
+				)}
 				<DataTable
 					data={filteredSales}
 					columns={columns}

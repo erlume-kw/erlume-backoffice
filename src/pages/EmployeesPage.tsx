@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, Column } from "@/components/common/DataTable";
 import { DetailPanel } from "@/components/common/DetailPanel";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -25,6 +26,8 @@ export default function EmployeesPage() {
 	const [formUserId, setFormUserId] = useState("");
 	const [formType, setFormType] = useState("");
 	const [formError, setFormError] = useState<string | null>(null);
+	const [selectedIds, setSelectedIds] = useState<string[]>([]);
+	const [bulkLoading, setBulkLoading] = useState(false);
 
 	const EMPLOYEE_TYPE_OPTIONS = [
 		{ value: "__none__", label: "None" },
@@ -78,7 +81,34 @@ export default function EmployeesPage() {
 		);
 	}, [safeEmployees, search]);
 
+	const allFilteredIds = filteredEmployees.map((e) => e._id);
+	const allSelected =
+		allFilteredIds.length > 0 &&
+		allFilteredIds.every((id) => selectedIds.includes(id));
+
 	const columns: Column<Employee>[] = [
+		{
+			key: "_select",
+			header: (
+				<Checkbox
+					checked={allSelected}
+					onCheckedChange={(v) => {
+						if (v) setSelectedIds(allFilteredIds);
+						else setSelectedIds([]);
+					}}
+				/>
+			),
+			render: (e) => (
+				<Checkbox
+					checked={selectedIds.includes(e._id)}
+					onCheckedChange={(v) => {
+						setSelectedIds((prev) =>
+							v ? [...prev, e._id] : prev.filter((id) => id !== e._id),
+						);
+					}}
+				/>
+			),
+		},
 		{
 			key: "name",
 			header: "Name",
@@ -109,6 +139,20 @@ export default function EmployeesPage() {
 			),
 		},
 	];
+
+	const handleBulkDelete = async () => {
+		if (!selectedIds.length) return;
+		setBulkLoading(true);
+		try {
+			await Promise.all(selectedIds.map((id) => restApi.employees.delete(id)));
+			setSelectedIds([]);
+			await reload();
+		} catch (err) {
+			setFormError(err instanceof Error ? err.message : "Bulk delete failed");
+		} finally {
+			setBulkLoading(false);
+		}
+	};
 
 	const handleDelete = async (id: string) => {
 		try {
@@ -183,6 +227,23 @@ export default function EmployeesPage() {
 					<div className="text-sm text-muted-foreground">
 						{loading ? "Loading employees..." : ""}
 						{error ? ` ${error}` : ""}
+					</div>
+				)}
+				{selectedIds.length > 0 && (
+					<div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 mb-2">
+						<span className="text-xs font-medium text-muted-foreground">
+							{selectedIds.length} selected
+						</span>
+						<div className="ml-auto">
+							<Button
+								variant="destructive"
+								size="sm"
+								className="h-8 text-xs"
+								disabled={bulkLoading}
+								onClick={() => void handleBulkDelete()}>
+								Delete Selected
+							</Button>
+						</div>
 					</div>
 				)}
 				<DataTable

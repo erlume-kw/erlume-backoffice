@@ -5,6 +5,7 @@ import { DataTable, Column } from "@/components/common/DataTable";
 import { DetailPanel } from "@/components/common/DetailPanel";
 import { FilterBar } from "@/components/common/FilterBar";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DateTimePicker } from "@/components/ui/date-picker";
@@ -59,6 +60,8 @@ export default function IncomesPage() {
 	);
 	const [formMonth, setFormMonth] = useState("");
 	const [formPrelaunchBag, setFormPrelaunchBag] = useState("");
+	const [selectedIds, setSelectedIds] = useState<string[]>([]);
+	const [bulkLoading, setBulkLoading] = useState(false);
 
 	const loadOrders = useCallback(
 		() => restApi.orders.getAll() as Promise<Order[]>,
@@ -175,6 +178,31 @@ export default function IncomesPage() {
 
 	const columns: Column<Income>[] = [
 		{
+			key: "_select",
+			header: (
+				<Checkbox
+					checked={
+						filteredIncomes.length > 0 &&
+						filteredIncomes.every((inc) => selectedIds.includes(inc._id))
+					}
+					onCheckedChange={(v) => {
+						if (v) setSelectedIds(filteredIncomes.map((inc) => inc._id));
+						else setSelectedIds([]);
+					}}
+				/>
+			),
+			render: (inc) => (
+				<Checkbox
+					checked={selectedIds.includes(inc._id)}
+					onCheckedChange={(v) => {
+						setSelectedIds((prev) =>
+							v ? [...prev, inc._id] : prev.filter((id) => id !== inc._id),
+						);
+					}}
+				/>
+			),
+		},
+		{
 			key: "amount",
 			header: "Amount",
 			render: (inc) => (
@@ -259,6 +287,20 @@ export default function IncomesPage() {
 			await reload();
 		} catch (err) {
 			console.error("Failed to delete income", err);
+		}
+	};
+
+	const handleBulkDelete = async () => {
+		if (!selectedIds.length) return;
+		setBulkLoading(true);
+		try {
+			await Promise.all(selectedIds.map((id) => restApi.incomes.delete(id)));
+			setSelectedIds([]);
+			await reload();
+		} catch (err) {
+			console.error("Bulk delete failed", err);
+		} finally {
+			setBulkLoading(false);
 		}
 	};
 
@@ -361,6 +403,23 @@ export default function IncomesPage() {
 									: error}
 							</span>
 						) : null}
+					</div>
+				)}
+				{selectedIds.length > 0 && (
+					<div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 mb-2">
+						<span className="text-xs font-medium text-muted-foreground">
+							{selectedIds.length} selected
+						</span>
+						<div className="ml-auto">
+							<Button
+								variant="destructive"
+								size="sm"
+								className="h-8 text-xs"
+								disabled={bulkLoading}
+								onClick={() => void handleBulkDelete()}>
+								Delete Selected
+							</Button>
+						</div>
 					</div>
 				)}
 				<FilterBar

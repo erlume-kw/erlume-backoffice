@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, Column } from "@/components/common/DataTable";
@@ -6,8 +6,16 @@ import { DetailPanel } from "@/components/common/DetailPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { DatePicker } from "@/components/ui/date-picker";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import type { DiscountCode } from "@/types/models";
 import { Ticket, Copy } from "lucide-react";
 import { restApi } from "@/lib/rest-client";
@@ -21,6 +29,10 @@ export default function DiscountsPage() {
 	const [formExpiryDate, setFormExpiryDate] = useState<Date | undefined>(
 		undefined,
 	);
+	const [selectedIds, setSelectedIds] = useState<string[]>([]);
+	const [showBulkUpdate, setShowBulkUpdate] = useState(false);
+	const [bulkActive, setBulkActive] = useState<"" | "active" | "inactive">("");
+	const [bulkLoading, setBulkLoading] = useState(false);
 	const loadDiscounts = useCallback(() => restApi.discountcodes.getAll(), []);
 	const {
 		data: discountCodes,
@@ -33,7 +45,44 @@ export default function DiscountsPage() {
 		navigator.clipboard.writeText(code);
 	};
 
+	const filteredCodes = useMemo(() => {
+		const list = Array.isArray(discountCodes) ? discountCodes : [];
+		return list.filter((dc) => {
+			return (
+				search === "" ||
+				(dc.code ?? "").toLowerCase().includes(search.toLowerCase())
+			);
+		});
+	}, [discountCodes, search]);
+
+	const allFilteredIds = filteredCodes.map((dc) => dc._id);
+	const allSelected =
+		allFilteredIds.length > 0 &&
+		allFilteredIds.every((id) => selectedIds.includes(id));
+
 	const columns: Column<DiscountCode>[] = [
+		{
+			key: "_select",
+			header: (
+				<Checkbox
+					checked={allSelected}
+					onCheckedChange={(v) => {
+						if (v) setSelectedIds(allFilteredIds);
+						else setSelectedIds([]);
+					}}
+				/>
+			),
+			render: (dc) => (
+				<Checkbox
+					checked={selectedIds.includes(dc._id)}
+					onCheckedChange={(v) => {
+						setSelectedIds((prev) =>
+							v ? [...prev, dc._id] : prev.filter((id) => id !== dc._id),
+						);
+					}}
+				/>
+			),
+		},
 		{
 			key: "code",
 			header: "Code",
@@ -87,12 +136,45 @@ export default function DiscountsPage() {
 		},
 	];
 
-	const filteredCodes = discountCodes.filter((dc) => {
-		return (
-			search === "" ||
-			(dc.code ?? "").toLowerCase().includes(search.toLowerCase())
-		);
-	});
+	const handleBulkDelete = async () => {
+		if (!selectedIds.length) return;
+		setBulkLoading(true);
+		try {
+			await Promise.all(selectedIds.map((id) => restApi.discountcodes.delete(id)));
+			setSelectedIds([]);
+			await reload();
+		} catch (err) {
+			console.error("Bulk delete failed", err);
+		} finally {
+			setBulkLoading(false);
+		}
+	};
+
+	const handleBulkUpdate = async () => {
+		if (!selectedIds.length || !bulkActive) return;
+		setBulkLoading(true);
+		try {
+			const nextIsActive = bulkActive === "active";
+			await Promise.all(
+				selectedIds.map((id) => {
+					const current = filteredCodes.find((dc) => dc._id === id);
+					if (!current) return Promise.resolve();
+					return restApi.discountcodes.update(id, {
+						...current,
+						is_active: nextIsActive,
+					});
+				}),
+			);
+			setSelectedIds([]);
+			setShowBulkUpdate(false);
+			setBulkActive("");
+			await reload();
+		} catch (err) {
+			console.error("Bulk update failed", err);
+		} finally {
+			setBulkLoading(false);
+		}
+	};
 
 	const handleDelete = async (id: string) => {
 		try {
@@ -151,6 +233,61 @@ export default function DiscountsPage() {
 					<div className="text-sm text-muted-foreground mb-3">
 						{loading ? "Loading discount codes..." : ""}
 						{error ? ` ${error}` : ""}
+					</div>
+				)}
+				{selectedIds.length > 0 && (
+					<div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 mb-2">
+						<span className="text-xs font-medium text-muted-foreground">
+							{selectedIds.length} selected
+						</span>
+						<div className="flex flex-wrap items-center gap-2 ml-auto">
+							<Button
+								variant="destructive"
+								size="sm"
+								className="h-8 text-xs"
+								disabled={bulkLoading}
+								onClick={() => void handleBulkDelete()}>
+								Delete Selected
+							</Button>
+							<Button
+								variant="outline"
+								size="sm"
+								className="h-8 text-xs"
+								onClick={() => setShowBulkUpdate((v) => !v)}>
+								{showBulkUpdate ? "Cancel" : "Bulk Update"}
+							</Button>
+							{showBulkUpdate && (
+								<>
+									<Select
+										value={bulkActive}
+										onValueChange={(v) =>
+											setBulkActive(v === "__none__" ? "" : (v as typeof bulkActive))
+										}>
+										<SelectTrigger className="h-8 w-40 text-xs">
+											<SelectValue placeholder="Set active" />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="__none__" className="text-xs">
+												—
+											</SelectItem>
+											<SelectItem value="active" className="text-xs">
+												Active
+											</SelectItem>
+											<SelectItem value="inactive" className="text-xs">
+												Inactive
+											</SelectItem>
+										</SelectContent>
+									</Select>
+									<Button
+										size="sm"
+										className="h-8 text-xs"
+										disabled={bulkLoading || !bulkActive}
+										onClick={() => void handleBulkUpdate()}>
+										{bulkLoading ? "Updating..." : "Apply"}
+									</Button>
+								</>
+							)}
+						</div>
 					</div>
 				)}
 				<DataTable

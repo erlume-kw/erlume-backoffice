@@ -1,9 +1,10 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, Column } from "@/components/common/DataTable";
 import { DetailPanel } from "@/components/common/DetailPanel";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Demand } from "@/types/models";
@@ -16,6 +17,8 @@ export default function DemandsPage() {
 	const [selectedDemand, setSelectedDemand] = useState<Demand | null>(null);
 	const [showForm, setShowForm] = useState(false);
 	const [editingDemand, setEditingDemand] = useState<Demand | null>(null);
+	const [selectedIds, setSelectedIds] = useState<string[]>([]);
+	const [bulkLoading, setBulkLoading] = useState(false);
 	const loadDemands = useCallback(() => restApi.demands.getAll(), []);
 	const {
 		data: demands,
@@ -24,7 +27,43 @@ export default function DemandsPage() {
 		reload,
 	} = useResourceList(loadDemands);
 
+	const filteredDemands = useMemo(() => {
+		const list = Array.isArray(demands) ? demands : [];
+		if (!search.trim()) return list;
+		const q = search.toLowerCase();
+		return list.filter((demand) =>
+			(demand.demand_name ?? "").toLowerCase().includes(q),
+		);
+	}, [demands, search]);
+
+	const allFilteredIds = filteredDemands.map((d) => d._id);
+	const allSelected =
+		allFilteredIds.length > 0 &&
+		allFilteredIds.every((id) => selectedIds.includes(id));
+
 	const columns: Column<Demand>[] = [
+		{
+			key: "_select",
+			header: (
+				<Checkbox
+					checked={allSelected}
+					onCheckedChange={(v) => {
+						if (v) setSelectedIds(allFilteredIds);
+						else setSelectedIds([]);
+					}}
+				/>
+			),
+			render: (demand) => (
+				<Checkbox
+					checked={selectedIds.includes(demand._id)}
+					onCheckedChange={(v) => {
+						setSelectedIds((prev) =>
+							v ? [...prev, demand._id] : prev.filter((id) => id !== demand._id),
+						);
+					}}
+				/>
+			),
+		},
 		{
 			key: "demand_name",
 			header: "Request",
@@ -52,14 +91,19 @@ export default function DemandsPage() {
 		},
 	];
 
-	const filteredDemands = demands.filter((demand) => {
-		const matchesSearch =
-			search === "" ||
-			(demand.demand_name ?? "")
-				.toLowerCase()
-				.includes(search.toLowerCase());
-		return matchesSearch;
-	});
+	const handleBulkDelete = async () => {
+		if (!selectedIds.length) return;
+		setBulkLoading(true);
+		try {
+			await Promise.all(selectedIds.map((id) => restApi.demands.delete(id)));
+			setSelectedIds([]);
+			await reload();
+		} catch (err) {
+			console.error("Bulk delete failed", err);
+		} finally {
+			setBulkLoading(false);
+		}
+	};
 
 	const handleDelete = async (id: string) => {
 		try {
@@ -114,6 +158,23 @@ export default function DemandsPage() {
 					<div className="text-sm text-muted-foreground">
 						{loading ? "Loading demands..." : ""}
 						{error ? ` ${error}` : ""}
+					</div>
+				)}
+				{selectedIds.length > 0 && (
+					<div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 mb-2">
+						<span className="text-xs font-medium text-muted-foreground">
+							{selectedIds.length} selected
+						</span>
+						<div className="ml-auto">
+							<Button
+								variant="destructive"
+								size="sm"
+								className="h-8 text-xs"
+								disabled={bulkLoading}
+								onClick={() => void handleBulkDelete()}>
+								Delete Selected
+							</Button>
+						</div>
 					</div>
 				)}
 				<DataTable

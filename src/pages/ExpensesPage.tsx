@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, Column } from "@/components/common/DataTable";
 import { DetailPanel } from "@/components/common/DetailPanel";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -33,6 +34,8 @@ export default function ExpensesPage() {
 	const [formPhase, setFormPhase] = useState("");
 	const [formType, setFormType] = useState("");
 	const [formError, setFormError] = useState<string | null>(null);
+	const [selectedIds, setSelectedIds] = useState<string[]>([]);
+	const [bulkLoading, setBulkLoading] = useState(false);
 
 	const loadExpenses = useCallback(
 		() => restApi.expenses.getAll() as Promise<Expense[]>,
@@ -99,7 +102,43 @@ export default function ExpensesPage() {
 					{ value: "services", label: "Services" },
 				];
 
+	const filteredExpenses = useMemo(() => {
+		const list = Array.isArray(expenses) ? expenses : [];
+		if (!search.trim()) return list;
+		const q = search.toLowerCase();
+		return list.filter(
+			(e) =>
+				(e.name ?? "").toLowerCase().includes(q) ||
+				(e.notes ?? "").toLowerCase().includes(q),
+		);
+	}, [expenses, search]);
+
 	const columns: Column<Expense>[] = [
+		{
+			key: "_select",
+			header: (
+				<Checkbox
+					checked={
+						filteredExpenses.length > 0 &&
+						filteredExpenses.every((e) => selectedIds.includes(e._id))
+					}
+					onCheckedChange={(v) => {
+						if (v) setSelectedIds(filteredExpenses.map((e) => e._id));
+						else setSelectedIds([]);
+					}}
+				/>
+			),
+			render: (e) => (
+				<Checkbox
+					checked={selectedIds.includes(e._id)}
+					onCheckedChange={(v) => {
+						setSelectedIds((prev) =>
+							v ? [...prev, e._id] : prev.filter((id) => id !== e._id),
+						);
+					}}
+				/>
+			),
+		},
 		{
 			key: "name",
 			header: "Name",
@@ -203,18 +242,21 @@ export default function ExpensesPage() {
 		},
 	];
 
-	const filteredExpenses = useMemo(() => {
-		const list = Array.isArray(expenses) ? expenses : [];
-		if (!search.trim()) return list;
-		const q = search.toLowerCase();
-		return list.filter(
-			(e) =>
-				(e.name ?? "").toLowerCase().includes(q) ||
-				(e.notes ?? "").toLowerCase().includes(q),
-		);
-	}, [expenses, search]);
-
 	const safeEmployees = Array.isArray(employees) ? employees : [];
+
+	const handleBulkDelete = async () => {
+		if (!selectedIds.length) return;
+		setBulkLoading(true);
+		try {
+			await Promise.all(selectedIds.map((id) => restApi.expenses.delete(id)));
+			setSelectedIds([]);
+			await reload();
+		} catch (err) {
+			console.error("Bulk delete failed", err);
+		} finally {
+			setBulkLoading(false);
+		}
+	};
 
 	const handleDelete = async (id: string) => {
 		try {
@@ -305,6 +347,23 @@ export default function ExpensesPage() {
 				{(loading || error) && (
 					<div className="text-sm text-muted-foreground">
 						{loading ? "Loading..." : ""} {error ? String(error) : ""}
+					</div>
+				)}
+				{selectedIds.length > 0 && (
+					<div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 mb-2">
+						<span className="text-xs font-medium text-muted-foreground">
+							{selectedIds.length} selected
+						</span>
+						<div className="ml-auto">
+							<Button
+								variant="destructive"
+								size="sm"
+								className="h-8 text-xs"
+								disabled={bulkLoading}
+								onClick={() => void handleBulkDelete()}>
+								Delete Selected
+							</Button>
+						</div>
 					</div>
 				)}
 				<DataTable

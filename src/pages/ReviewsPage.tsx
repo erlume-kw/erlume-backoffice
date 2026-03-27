@@ -1,9 +1,10 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, Column } from "@/components/common/DataTable";
 import { DetailPanel } from "@/components/common/DetailPanel";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -24,6 +25,8 @@ export default function ReviewsPage() {
 	const [selectedReview, setSelectedReview] = useState<Review | null>(null);
 	const [showForm, setShowForm] = useState(false);
 	const [editingReview, setEditingReview] = useState<Review | null>(null);
+	const [selectedIds, setSelectedIds] = useState<string[]>([]);
+	const [bulkLoading, setBulkLoading] = useState(false);
 	const loadReviews = useCallback(() => restApi.reviews.getAll(), []);
 	const loadReviewStars = useCallback(
 		() => restApi.enums.getByCategory("reviewStars"),
@@ -52,7 +55,43 @@ export default function ReviewsPage() {
 		);
 	};
 
+	const safeReviews = Array.isArray(reviews) ? reviews : [];
+	const filteredReviews = useMemo(() => {
+		if (!search.trim()) return safeReviews;
+		const q = search.toLowerCase();
+		return safeReviews.filter((review) =>
+			(review.description ?? "").toLowerCase().includes(q),
+		);
+	}, [safeReviews, search]);
+
+	const allFilteredIds = filteredReviews.map((r) => r._id);
+	const allSelected =
+		allFilteredIds.length > 0 &&
+		allFilteredIds.every((id) => selectedIds.includes(id));
+
 	const columns: Column<Review>[] = [
+		{
+			key: "_select",
+			header: (
+				<Checkbox
+					checked={allSelected}
+					onCheckedChange={(v) => {
+						if (v) setSelectedIds(allFilteredIds);
+						else setSelectedIds([]);
+					}}
+				/>
+			),
+			render: (review) => (
+				<Checkbox
+					checked={selectedIds.includes(review._id)}
+					onCheckedChange={(v) => {
+						setSelectedIds((prev) =>
+							v ? [...prev, review._id] : prev.filter((id) => id !== review._id),
+						);
+					}}
+				/>
+			),
+		},
 		{
 			key: "rating",
 			header: "Rating",
@@ -80,12 +119,19 @@ export default function ReviewsPage() {
 		},
 	];
 
-	const filteredReviews = reviews.filter((review) => {
-		const matchesSearch =
-			search === "" ||
-			(review.description ?? "").toLowerCase().includes(search.toLowerCase());
-		return matchesSearch;
-	});
+	const handleBulkDelete = async () => {
+		if (!selectedIds.length) return;
+		setBulkLoading(true);
+		try {
+			await Promise.all(selectedIds.map((id) => restApi.reviews.delete(id)));
+			setSelectedIds([]);
+			await reload();
+		} catch (err) {
+			console.error("Bulk delete failed", err);
+		} finally {
+			setBulkLoading(false);
+		}
+	};
 
 	const handleDelete = async (id: string) => {
 		try {
@@ -134,6 +180,23 @@ export default function ReviewsPage() {
 					<div className="text-sm text-muted-foreground">
 						{loading ? "Loading reviews..." : ""}
 						{error ? ` ${error}` : ""}
+					</div>
+				)}
+				{selectedIds.length > 0 && (
+					<div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 mb-2">
+						<span className="text-xs font-medium text-muted-foreground">
+							{selectedIds.length} selected
+						</span>
+						<div className="ml-auto">
+							<Button
+								variant="destructive"
+								size="sm"
+								className="h-8 text-xs"
+								disabled={bulkLoading}
+								onClick={() => void handleBulkDelete()}>
+								Delete Selected
+							</Button>
+						</div>
 					</div>
 				)}
 				<DataTable

@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, Column } from "@/components/common/DataTable";
 import { DetailPanel } from "@/components/common/DetailPanel";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -28,6 +29,8 @@ export default function SubCategoriesPage() {
 	const [formCategoryId, setFormCategoryId] = useState("");
 	const [formDemandId, setFormDemandId] = useState("");
 	const [formError, setFormError] = useState<string | null>(null);
+	const [selectedIds, setSelectedIds] = useState<string[]>([]);
+	const [bulkLoading, setBulkLoading] = useState(false);
 
 	const loadSubCategories = useCallback(
 		() => restApi.subcategories.getAll(),
@@ -67,6 +70,28 @@ export default function SubCategoriesPage() {
 	);
 
 	const columns: Column<SubCategory>[] = [
+		{
+			key: "_select",
+			header: (
+				<Checkbox
+					checked={allSelected}
+					onCheckedChange={(v) => {
+						if (v) setSelectedIds(allFilteredIds);
+						else setSelectedIds([]);
+					}}
+				/>
+			),
+			render: (sub) => (
+				<Checkbox
+					checked={selectedIds.includes(sub._id)}
+					onCheckedChange={(v) => {
+						setSelectedIds((prev) =>
+							v ? [...prev, sub._id] : prev.filter((id) => id !== sub._id),
+						);
+					}}
+				/>
+			),
+		},
 		{
 			key: "sub_cat_name",
 			header: "Subcategory",
@@ -125,12 +150,31 @@ export default function SubCategoriesPage() {
 		);
 	});
 
+	const allFilteredIds = filteredSubCategories.map((s) => s._id);
+	const allSelected =
+		allFilteredIds.length > 0 &&
+		allFilteredIds.every((id) => selectedIds.includes(id));
+
 	const handleDelete = async (id: string) => {
 		try {
 			await restApi.subcategories.delete(id);
 			await reload();
 		} catch (err) {
 			console.error("Failed to delete subcategory", err);
+		}
+	};
+
+	const handleBulkDelete = async () => {
+		if (!selectedIds.length) return;
+		setBulkLoading(true);
+		try {
+			await Promise.all(selectedIds.map((id) => restApi.subcategories.delete(id)));
+			setSelectedIds([]);
+			await reload();
+		} catch (err) {
+			console.error("Bulk delete failed", err);
+		} finally {
+			setBulkLoading(false);
 		}
 	};
 
@@ -200,6 +244,23 @@ export default function SubCategoriesPage() {
 					<div className="text-sm text-muted-foreground">
 						{loading ? "Loading subcategories..." : ""}
 						{error ? ` ${error}` : ""}
+					</div>
+				)}
+				{selectedIds.length > 0 && (
+					<div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 mb-2">
+						<span className="text-xs font-medium text-muted-foreground">
+							{selectedIds.length} selected
+						</span>
+						<div className="ml-auto">
+							<Button
+								variant="destructive"
+								size="sm"
+								className="h-8 text-xs"
+								disabled={bulkLoading}
+								onClick={() => void handleBulkDelete()}>
+								Delete Selected
+							</Button>
+						</div>
 					</div>
 				)}
 				<DataTable

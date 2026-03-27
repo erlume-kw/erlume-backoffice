@@ -27,6 +27,8 @@ export default function OutfitItemsPage() {
 	const [editingOutfitItem, setEditingOutfitItem] = useState<OutfitItem | null>(
 		null,
 	);
+	const [selectedIds, setSelectedIds] = useState<string[]>([]);
+	const [bulkLoading, setBulkLoading] = useState(false);
 	const [itemSearch, setItemSearch] = useState("");
 	const [outfitSearch, setOutfitSearch] = useState("");
 	const [formItemId, setFormItemId] = useState("");
@@ -104,7 +106,47 @@ export default function OutfitItemsPage() {
 		});
 	}, [outfitLabelById, outfitSearch, outfits]);
 
+	const safeOutfitItems = Array.isArray(outfitItems) ? outfitItems : [];
+	const filteredOutfitItems = useMemo(() => {
+		if (!search.trim()) return safeOutfitItems;
+		const q = search.toLowerCase();
+		return safeOutfitItems.filter(
+			(oi) =>
+				(outfitLabelById.get(oi.outfit_id) ?? oi.outfit_id)
+					.toLowerCase()
+					.includes(q) ||
+				(itemLabelById.get(oi.item_id) ?? oi.item_id).toLowerCase().includes(q),
+		);
+	}, [safeOutfitItems, search, outfitLabelById, itemLabelById]);
+
+	const allFilteredIds = filteredOutfitItems.map((oi) => oi._id);
+	const allSelected =
+		allFilteredIds.length > 0 &&
+		allFilteredIds.every((id) => selectedIds.includes(id));
+
 	const columns: Column<OutfitItem>[] = [
+		{
+			key: "_select",
+			header: (
+				<Checkbox
+					checked={allSelected}
+					onCheckedChange={(v) => {
+						if (v) setSelectedIds(allFilteredIds);
+						else setSelectedIds([]);
+					}}
+				/>
+			),
+			render: (oi) => (
+				<Checkbox
+					checked={selectedIds.includes(oi._id)}
+					onCheckedChange={(v) => {
+						setSelectedIds((prev) =>
+							v ? [...prev, oi._id] : prev.filter((id) => id !== oi._id),
+						);
+					}}
+				/>
+			),
+		},
 		{
 			key: "outfit_id",
 			header: "Outfit",
@@ -133,6 +175,20 @@ export default function OutfitItemsPage() {
 			),
 		},
 	];
+
+	const handleBulkDelete = async () => {
+		if (!selectedIds.length) return;
+		setBulkLoading(true);
+		try {
+			await Promise.all(selectedIds.map((id) => restApi.outfititems.delete(id)));
+			setSelectedIds([]);
+			await reload();
+		} catch (err) {
+			console.error("Bulk delete failed", err);
+		} finally {
+			setBulkLoading(false);
+		}
+	};
 
 	const filteredOutfitItems = outfitItems.filter((outfitItem) => {
 		const query = search.toLowerCase();
@@ -199,6 +255,23 @@ export default function OutfitItemsPage() {
 					<div className="text-sm text-muted-foreground">
 						{loading ? "Loading outfit items..." : ""}
 						{error ? ` ${error}` : ""}
+					</div>
+				)}
+				{selectedIds.length > 0 && (
+					<div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 mb-2">
+						<span className="text-xs font-medium text-muted-foreground">
+							{selectedIds.length} selected
+						</span>
+						<div className="ml-auto">
+							<Button
+								variant="destructive"
+								size="sm"
+								className="h-8 text-xs"
+								disabled={bulkLoading}
+								onClick={() => void handleBulkDelete()}>
+								Delete Selected
+							</Button>
+						</div>
 					</div>
 				)}
 				<DataTable

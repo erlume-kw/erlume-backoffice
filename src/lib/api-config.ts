@@ -1,8 +1,6 @@
 // API Configuration
 const RAW_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 export const API_BASE_URL = RAW_API_BASE_URL.replace(/\/+$/, "");
-export const GRAPHQL_ENDPOINT =
-	import.meta.env.VITE_GRAPHQL_ENDPOINT || "/graphql";
 
 /** OpenAPI spec URL for backoffice (Swagger UI, codegen). Prefer loading from backend. */
 function getOpenApiSpecUrl(): string {
@@ -26,15 +24,18 @@ export const endpoints = {
 	categories: `${API_BASE_URL}/categories`,
 	subcategories: `${API_BASE_URL}/sub-categories`,
 	orders: `${API_BASE_URL}/orders`,
-	orderitems: `${API_BASE_URL}/order-items`,
+	// Backend route uses /api/orderitems (no dash)
+	orderitems: `${API_BASE_URL}/orderitems`,
 	transactions: `${API_BASE_URL}/transactions`,
-	creditcards: `${API_BASE_URL}/credit-cards`,
+	// Backend route uses /api/creditcards (no dash)
+	creditcards: `${API_BASE_URL}/creditcards`,
 	reviews: `${API_BASE_URL}/reviews`,
 	drops: `${API_BASE_URL}/drops`,
 	demands: `${API_BASE_URL}/demands`,
 	discountcodes: `${API_BASE_URL}/discount-codes`,
 	outfits: `${API_BASE_URL}/outfits`,
-	outfititems: `${API_BASE_URL}/outfit-items`,
+	// Backend route uses /api/outfititems (no dash)
+	outfititems: `${API_BASE_URL}/outfititems`,
 	incomes: `${API_BASE_URL}/incomes`,
 	expenses: `${API_BASE_URL}/expenses`,
 	sales: `${API_BASE_URL}/sales`,
