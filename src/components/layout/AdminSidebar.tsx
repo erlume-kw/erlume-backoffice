@@ -137,25 +137,6 @@ export function AdminSidebar() {
 						})}
 					</ul>
 				</nav>
-
-				{/* Footer */}
-				<div className="border-t border-sidebar-border p-4">
-					{!isCompact && (
-						<div className="flex items-center gap-3">
-							<div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
-								<span className="text-xs font-medium text-primary">AD</span>
-							</div>
-							<div className="flex-1 min-w-0">
-								<p className="text-sm font-medium text-foreground truncate">
-									Admin User
-								</p>
-								<p className="text-xs text-muted-foreground truncate">
-									admin@marketplace.com
-								</p>
-							</div>
-						</div>
-					)}
-				</div>
 			</aside>
 		</>
 	);

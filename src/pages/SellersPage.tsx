@@ -44,9 +44,18 @@ export default function SellersPage() {
 	const [formCity, setFormCity] = useState("");
 	const [escalationStatusSelectValue, setEscalationStatusSelectValue] =
 		useState("__none__");
+	const [onboardingStatusSelectValue, setOnboardingStatusSelectValue] =
+		useState("__none__");
+	const [itemsOnboardingStatusSelectValue, setItemsOnboardingStatusSelectValue] =
+		useState("__none__");
 	const [formPreferredPickupDate, setFormPreferredPickupDate] = useState<
 		Date | undefined
 	>(undefined);
+	const [selectedIds, setSelectedIds] = useState<string[]>([]);
+	const [showBulkUpdate, setShowBulkUpdate] = useState(false);
+	const [bulkOnboardingStatus, setBulkOnboardingStatus] = useState("");
+	const [bulkItemsOnboardingStatus, setBulkItemsOnboardingStatus] = useState("");
+	const [bulkLoading, setBulkLoading] = useState(false);
 	const [formPolicyAcceptedAt, setFormPolicyAcceptedAt] = useState<
 		Date | undefined
 	>(undefined);
@@ -72,13 +81,29 @@ export default function SellersPage() {
 		() => restApi.items.getAll() as Promise<Item[]>,
 		[],
 	);
+	const sellerOnboardingOptions = [
+		{ value: "initial_contact", label: "Initial Contact" },
+		{ value: "price_shared", label: "Price Shared" },
+		{ value: "google_form_submitted", label: "Google Form Submitted" },
+		{ value: "manual_entry_pending", label: "Manual Entry Pending" },
+		{ value: "ready_for_pickup", label: "Ready For Pickup" },
+		{ value: "onboarded", label: "Onboarded" },
+	];
+	const itemsOnboardingOptions = [
+		{ value: "no_items", label: "No Items" },
+		{ value: "items_pending_pickup", label: "Items Pending Pickup" },
+		{ value: "items_received", label: "Items Received" },
+		{ value: "items_in_processing", label: "Items In Processing" },
+		{ value: "items_listed", label: "Items Listed" },
+		{ value: "partially_listed", label: "Partially Listed" },
+	];
 	const {
 		data: sellers,
 		loading,
 		error,
 		reload,
 	} = useResourceList(loadSellers);
-	const { data: users } = useResourceList(loadUsers);
+	const { data: users, reload: reloadUsers } = useResourceList(loadUsers);
 	const { data: governorates } = useResourceList(loadGovernorates);
 	const { data: cities } = useResourceList(loadCities);
 	const { data: items, reload: reloadItems } = useResourceList(loadItems);
@@ -208,7 +233,40 @@ export default function SellersPage() {
 
 	const formatPhoneNumber = (value: string) => value.trim();
 
+	const filteredSellers = useMemo(() => {
+		return sellers.filter((seller) => {
+			const matchesSearch =
+				search === "" ||
+				getUserIdLabel(seller.userId)
+					.toLowerCase()
+					.includes(search.toLowerCase());
+			const matchesStatus =
+				!filters.status ||
+				(filters.status === "active"
+					? !seller.isDeactivated
+					: seller.isDeactivated);
+			return matchesSearch && matchesStatus;
+		});
+	}, [filters.status, search, sellers]);
+	const allFilteredSellerIds = filteredSellers.map((s) => s._id);
+	const allSellersSelected = allFilteredSellerIds.length > 0 && allFilteredSellerIds.every((id) => selectedIds.includes(id));
+
 	const columns: Column<Seller>[] = [
+		{
+			key: "_select",
+			header: (
+				<Checkbox
+					checked={allSellersSelected}
+					onCheckedChange={(v) => { if (v) setSelectedIds(allFilteredSellerIds); else setSelectedIds([]); }}
+				/>
+			),
+			render: (seller) => (
+				<Checkbox
+					checked={selectedIds.includes(seller._id)}
+					onCheckedChange={(v) => { setSelectedIds((prev) => v ? [...prev, seller._id] : prev.filter((id) => id !== seller._id)); }}
+				/>
+			),
+		},
 		{
 			key: "userId",
 			header: "Seller",
@@ -234,6 +292,26 @@ export default function SellersPage() {
 			render: (seller) => (
 				<StatusBadge status={seller.isDeactivated ? "inactive" : "active"} />
 			),
+		},
+		{
+			key: "onboardingStatus",
+			header: "Onboarding",
+			render: (seller) =>
+				seller.onboardingStatus ? (
+					<StatusBadge status={seller.onboardingStatus} />
+				) : (
+					<span className="text-muted-foreground">—</span>
+				),
+		},
+		{
+			key: "itemsOnboardingStatus",
+			header: "Items Status",
+			render: (seller) =>
+				seller.itemsOnboardingStatus ? (
+					<StatusBadge status={seller.itemsOnboardingStatus} />
+				) : (
+					<span className="text-muted-foreground">—</span>
+				),
 		},
 		{
 			key: "balance",
@@ -287,21 +365,32 @@ export default function SellersPage() {
 		},
 	];
 
-	const filteredSellers = useMemo(() => {
-		return sellers.filter((seller) => {
-			const matchesSearch =
-				search === "" ||
-				getUserIdLabel(seller.userId)
-					.toLowerCase()
-					.includes(search.toLowerCase());
-			const matchesStatus =
-				!filters.status ||
-				(filters.status === "active"
-					? !seller.isDeactivated
-					: seller.isDeactivated);
-			return matchesSearch && matchesStatus;
-		});
-	}, [filters.status, search, sellers]);
+
+	const handleBulkDelete = async () => {
+		if (!selectedIds.length) return;
+		setBulkLoading(true);
+		try {
+			await Promise.all(selectedIds.map((id) => restApi.sellers.delete(id)));
+			setSelectedIds([]);
+			await reload();
+		} catch (err) { console.error('Bulk delete failed', err); }
+		finally { setBulkLoading(false); }
+	};
+
+	const handleBulkUpdate = async () => {
+		if (!selectedIds.length || (!bulkOnboardingStatus && !bulkItemsOnboardingStatus)) return;
+		setBulkLoading(true);
+		try {
+			const patch: Record<string, string> = {};
+			if (bulkOnboardingStatus) patch.onboardingStatus = bulkOnboardingStatus;
+			if (bulkItemsOnboardingStatus) patch.itemsOnboardingStatus = bulkItemsOnboardingStatus;
+			await Promise.all(selectedIds.map((id) => restApi.sellers.patch(id, patch)));
+			setSelectedIds([]); setShowBulkUpdate(false);
+			setBulkOnboardingStatus(""); setBulkItemsOnboardingStatus("");
+			await reload();
+		} catch (err) { console.error('Bulk update failed', err); }
+		finally { setBulkLoading(false); }
+	};
 
 	const handleDelete = async (seller: Seller) => {
 		try {
@@ -317,7 +406,7 @@ export default function SellersPage() {
 				setEditingSeller(null);
 				setShowForm(false);
 			}
-			await Promise.all([reload(), reloadItems()]);
+			await Promise.all([reload(), reloadItems(), reloadUsers()]);
 		} catch (err) {
 			const message =
 				err instanceof Error ? err.message : "Failed to delete seller";
@@ -345,6 +434,10 @@ export default function SellersPage() {
 				String(formData.get("escalationStatus") || "").trim() || undefined,
 			escalationNotes:
 				String(formData.get("escalationNotes") || "").trim() || undefined,
+			onboardingStatus:
+				onboardingStatusSelectValue === "__none__" ? undefined : onboardingStatusSelectValue,
+			itemsOnboardingStatus:
+				itemsOnboardingStatusSelectValue === "__none__" ? undefined : itemsOnboardingStatusSelectValue,
 			sellerPolicyAcceptedAt: formPolicyAcceptedAt
 				? formPolicyAcceptedAt.toISOString()
 				: undefined,
@@ -379,6 +472,10 @@ export default function SellersPage() {
 			preferredPickupDate: formPreferredPickupDate
 				? formPreferredPickupDate.toISOString().slice(0, 10)
 				: "",
+			onboardingStatus:
+				onboardingStatusSelectValue === "__none__" ? undefined : onboardingStatusSelectValue,
+			itemsOnboardingStatus:
+				itemsOnboardingStatusSelectValue === "__none__" ? undefined : itemsOnboardingStatusSelectValue,
 		};
 
 		try {
@@ -472,13 +569,24 @@ export default function SellersPage() {
 					}
 				}
 				if (itemSyncErrors.length > 0) {
-					setFormError(
-						firstErrorMessage
-							? `Seller saved, but ${itemSyncErrors.length} item(s) could not be assigned: ${firstErrorMessage}`
-							: `Seller saved, but ${itemSyncErrors.length} item(s) could not be assigned. Ensure the backend supports PATCH or PUT on /api/items/{id} with seller_id or sellerId.`,
+					// Seller was saved — close form and reload, then show a non-blocking warning
+					await Promise.all([reload(), reloadItems(), reloadUsers()]);
+					setShowForm(false);
+					setEditingSeller(null);
+					setFormStep(1);
+					setSelectedItemIds([]);
+					setFormPreferredPickupDate(undefined);
+					setFormPolicyAcceptedAt(undefined);
+					setFormUserId("");
+					setUserSearch("");
+					setEscalationStatusSelectValue("__none__");
+					setOnboardingStatusSelectValue("__none__");
+					setItemsOnboardingStatusSelectValue("__none__");
+					setFormError(null);
+					// Log warning but don't block the user
+					console.warn(
+						`Seller saved, but ${itemSyncErrors.length} item(s) could not be synced (they may not exist in the DB).`,
 					);
-					// Still reload to show the updated seller data even if item sync had errors
-					await Promise.all([reload(), reloadItems()]);
 					return;
 				}
 			} else {
@@ -493,7 +601,7 @@ export default function SellersPage() {
 					);
 					if (!foundUser) {
 						// Still reload to show the created seller if it exists
-						await Promise.all([reload(), reloadItems()]);
+						await Promise.all([reload(), reloadItems(), reloadUsers()]);
 						setFormError(
 							"User was created but response was empty. Please check if the seller was created successfully.",
 						);
@@ -504,7 +612,7 @@ export default function SellersPage() {
 				// id = user ID (backend accepts seller _id or user ID)
 				await restApi.sellers.update(createdUser._id, createSellerPayload);
 			}
-			await Promise.all([reload(), reloadItems()]);
+			await Promise.all([reload(), reloadItems(), reloadUsers()]);
 			// Clear form state
 			setShowForm(false);
 			setEditingSeller(null);
@@ -515,6 +623,8 @@ export default function SellersPage() {
 			setFormUserId("");
 			setUserSearch("");
 			setEscalationStatusSelectValue("__none__");
+			setOnboardingStatusSelectValue("__none__");
+			setItemsOnboardingStatusSelectValue("__none__");
 			setFormError(null);
 		} catch (err) {
 			const message =
@@ -555,6 +665,8 @@ export default function SellersPage() {
 					setFormCity(cityValues[0] ?? "");
 					setFormIsDeactivated(false);
 					setEscalationStatusSelectValue("__none__");
+					setOnboardingStatusSelectValue("__none__");
+					setItemsOnboardingStatusSelectValue("__none__");
 					setShowForm(true);
 				}}
 				addLabel="Create Seller"
@@ -601,6 +713,22 @@ export default function SellersPage() {
 					<Label htmlFor="show-deleted-sellers">Show deleted</Label>
 				</div>
 
+				{selectedIds.length > 0 && (
+					<div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 mb-2">
+						<span className="text-xs font-medium text-muted-foreground">{selectedIds.length} selected</span>
+						<div className="flex flex-wrap items-center gap-2 ml-auto">
+							<Button variant="destructive" size="sm" className="h-8 text-xs" disabled={bulkLoading} onClick={() => void handleBulkDelete()}>Delete Selected</Button>
+							<Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setShowBulkUpdate((v) => !v)}>{showBulkUpdate ? "Cancel" : "Bulk Update"}</Button>
+							{showBulkUpdate && (
+								<>
+									<Select value={bulkOnboardingStatus} onValueChange={setBulkOnboardingStatus}><SelectTrigger className="h-8 w-44 text-xs"><SelectValue placeholder="Set onboarding" /></SelectTrigger><SelectContent>{sellerOnboardingOptions.map(({ value, label }) => (<SelectItem key={value} value={value} className="text-xs">{label}</SelectItem>))}</SelectContent></Select>
+									<Select value={bulkItemsOnboardingStatus} onValueChange={setBulkItemsOnboardingStatus}><SelectTrigger className="h-8 w-44 text-xs"><SelectValue placeholder="Set items status" /></SelectTrigger><SelectContent>{itemsOnboardingOptions.map(({ value, label }) => (<SelectItem key={value} value={value} className="text-xs">{label}</SelectItem>))}</SelectContent></Select>
+									<Button size="sm" className="h-8 text-xs" disabled={bulkLoading || (!bulkOnboardingStatus && !bulkItemsOnboardingStatus)} onClick={() => void handleBulkUpdate()}>{bulkLoading ? "Updating..." : "Apply"}</Button>
+								</>
+							)}
+						</div>
+					</div>
+				)}
 				<DataTable
 					data={filteredSellers}
 					columns={columns}
@@ -629,6 +757,8 @@ export default function SellersPage() {
 						setEscalationStatusSelectValue(
 							(seller.escalationStatus ?? "") || "__none__",
 						);
+						setOnboardingStatusSelectValue(seller.onboardingStatus || "initial_contact");
+						setItemsOnboardingStatusSelectValue(seller.itemsOnboardingStatus || "no_items");
 						setShowForm(true);
 					}}
 					onDelete={(seller) => {
@@ -717,6 +847,27 @@ export default function SellersPage() {
 									{selectedSeller.consentGiven ? "Yes" : "No"}
 								</p>
 							</div>
+							{(selectedSeller.onboardingStatus || selectedSeller.itemsOnboardingStatus) && (
+								<>
+									<div className="p-3 bg-muted/30 rounded-lg">
+										<span className="text-sm text-muted-foreground">Seller Onboarding</span>
+										<div className="mt-1">
+											{selectedSeller.onboardingStatus ? (
+												<StatusBadge status={selectedSeller.onboardingStatus} />
+											) : <p className="text-sm">—</p>}
+										</div>
+									</div>
+									<div className="p-3 bg-muted/30 rounded-lg">
+										<span className="text-sm text-muted-foreground">Items Onboarding</span>
+										<div className="mt-1">
+											{selectedSeller.itemsOnboardingStatus ? (
+												<StatusBadge status={selectedSeller.itemsOnboardingStatus} />
+											) : <p className="text-sm">—</p>}
+										</div>
+									</div>
+								</>
+							)}
+
 							{(selectedSeller.escalationStatus ??
 								selectedSeller.escalationNotes) && (
 								<>
@@ -773,6 +924,8 @@ export default function SellersPage() {
 								setEscalationStatusSelectValue(
 									(selectedSeller.escalationStatus ?? "") || "__none__",
 								);
+								setOnboardingStatusSelectValue(selectedSeller.onboardingStatus || "initial_contact");
+								setItemsOnboardingStatusSelectValue(selectedSeller.itemsOnboardingStatus || "no_items");
 								setShowForm(true);
 								setSelectedSeller(null);
 							}}>
@@ -797,6 +950,8 @@ export default function SellersPage() {
 					setFormCity("");
 								setFormIsDeactivated(false);
 					setEscalationStatusSelectValue("__none__");
+					setOnboardingStatusSelectValue("__none__");
+					setItemsOnboardingStatusSelectValue("__none__");
 				}}
 				title={editingSeller ? "Update Seller" : "Create Seller"}
 				type="dialog"
@@ -1002,6 +1157,30 @@ export default function SellersPage() {
 									/>
 								</div>
 								<div className="space-y-2">
+									<Label>Seller Onboarding Status</Label>
+									<Select value={onboardingStatusSelectValue} onValueChange={setOnboardingStatusSelectValue}>
+										<SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+										<SelectContent>
+											<SelectItem value="__none__">None</SelectItem>
+											{sellerOnboardingOptions.map(({ value, label }) => (
+												<SelectItem key={value} value={value}>{label}</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+								</div>
+								<div className="space-y-2">
+									<Label>Items Onboarding Status</Label>
+									<Select value={itemsOnboardingStatusSelectValue} onValueChange={setItemsOnboardingStatusSelectValue}>
+										<SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+										<SelectContent>
+											<SelectItem value="__none__">None</SelectItem>
+											{itemsOnboardingOptions.map(({ value, label }) => (
+												<SelectItem key={value} value={value}>{label}</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+								</div>
+								<div className="space-y-2">
 									<Label>Policy accepted at</Label>
 									<DateTimePicker
 										value={formPolicyAcceptedAt}
@@ -1204,6 +1383,8 @@ export default function SellersPage() {
 								setFormUserId("");
 								setUserSearch("");
 								setEscalationStatusSelectValue("__none__");
+								setOnboardingStatusSelectValue("__none__");
+								setItemsOnboardingStatusSelectValue("__none__");
 							}}>
 							Cancel
 						</Button>

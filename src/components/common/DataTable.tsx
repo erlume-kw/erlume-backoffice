@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 
 export interface Column<T> {
 	key: keyof T | string;
-	header: string;
+	header: string | ReactNode;
 	render?: (item: T) => ReactNode;
 	sortable?: boolean;
 	className?: string;

@@ -40,6 +40,8 @@ export interface Seller {
 	sellerPolicyAcceptedAt?: string;
 	escalationStatus?: string;
 	escalationNotes?: string;
+	onboardingStatus?: string;
+	itemsOnboardingStatus?: string;
 	createdAt: string;
 	updatedAt: string;
 }

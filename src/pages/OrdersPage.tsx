@@ -46,6 +46,11 @@ export default function OrdersPage() {
 	const [formDeliveryDate, setFormDeliveryDate] = useState<Date | undefined>(
 		undefined,
 	);
+	const [selectedIds, setSelectedIds] = useState<string[]>([]);
+	const [showBulkUpdate, setShowBulkUpdate] = useState(false);
+	const [bulkOrderStatus, setBulkOrderStatus] = useState("");
+	const [bulkDeliveryStatus, setBulkDeliveryStatus] = useState("");
+	const [bulkLoading, setBulkLoading] = useState(false);
 	const loadOrders = useCallback(
 		() => restApi.orders.getAll() as Promise<Order[]>,
 		[],
@@ -261,7 +266,39 @@ export default function OrdersPage() {
 		showForm,
 	]);
 
+	const filteredOrders = orders.filter((order) => {
+		const customerLabel = getUserLabel(order.user_id);
+		const orderUserId = getUserIdValue(order.user_id);
+		const matchesSearch =
+			search === "" ||
+			(order._id ?? "").toLowerCase().includes(search.toLowerCase()) ||
+			(orderUserId ?? "")
+				.toLowerCase()
+				.includes(search.toLowerCase()) ||
+			(customerLabel ?? "").toLowerCase().includes(search.toLowerCase());
+		const matchesStatus =
+			!filters.status ||
+			normalizeStatusValue(order.order_status) === filters.status;
+		const matchesUser =
+			!filters.user ||
+			orderUserId === filters.user ||
+			order.user_id === filters.user;
+		return matchesSearch && matchesStatus && matchesUser;
+	});
+
+	const allFilteredOrderIds = filteredOrders.map((o) => o._id);
+	const allOrdersSelected = allFilteredOrderIds.length > 0 && allFilteredOrderIds.every((id) => selectedIds.includes(id));
+
 	const columns: Column<Order>[] = [
+		{
+			key: "_select",
+			header: (
+				<Checkbox checked={allOrdersSelected} onCheckedChange={(v) => { if (v) setSelectedIds(allFilteredOrderIds); else setSelectedIds([]); }} />
+			),
+			render: (order) => (
+				<Checkbox checked={selectedIds.includes(order._id)} onCheckedChange={(v) => { setSelectedIds((prev) => v ? [...prev, order._id] : prev.filter((id) => id !== order._id)); }} />
+			),
+		},
 		{
 			key: "_id",
 			header: "Order",
@@ -304,25 +341,30 @@ export default function OrdersPage() {
 		},
 	];
 
-	const filteredOrders = orders.filter((order) => {
-		const customerLabel = getUserLabel(order.user_id);
-		const orderUserId = getUserIdValue(order.user_id);
-		const matchesSearch =
-			search === "" ||
-			(order._id ?? "").toLowerCase().includes(search.toLowerCase()) ||
-			(orderUserId ?? "")
-				.toLowerCase()
-				.includes(search.toLowerCase()) ||
-			(customerLabel ?? "").toLowerCase().includes(search.toLowerCase());
-		const matchesStatus =
-			!filters.status ||
-			normalizeStatusValue(order.order_status) === filters.status;
-		const matchesUser =
-			!filters.user ||
-			orderUserId === filters.user ||
-			order.user_id === filters.user;
-		return matchesSearch && matchesStatus && matchesUser;
-	});
+
+	const handleBulkDelete = async () => {
+		if (!selectedIds.length) return;
+		setBulkLoading(true);
+		try {
+			await Promise.all(selectedIds.map((id) => restApi.orders.delete(id)));
+			setSelectedIds([]); await reload();
+		} catch (err) { console.error('Bulk delete failed', err); }
+		finally { setBulkLoading(false); }
+	};
+
+	const handleBulkUpdate = async () => {
+		if (!selectedIds.length || (!bulkOrderStatus && !bulkDeliveryStatus)) return;
+		setBulkLoading(true);
+		try {
+			const patch: Record<string, string> = {};
+			if (bulkOrderStatus) patch.order_status = bulkOrderStatus;
+			if (bulkDeliveryStatus) patch.deliveryStatus = bulkDeliveryStatus;
+			await Promise.all(selectedIds.map((id) => restApi.ordersExtra.patch(id, patch)));
+			setSelectedIds([]); setShowBulkUpdate(false); setBulkOrderStatus(""); setBulkDeliveryStatus("");
+			await reload();
+		} catch (err) { console.error('Bulk update failed', err); }
+		finally { setBulkLoading(false); }
+	};
 
 	const handleFilterChange = (key: string, value: string | undefined) => {
 		setFilters((prev) => ({ ...prev, [key]: value }));
@@ -596,6 +638,22 @@ export default function OrdersPage() {
 					onClearAll={() => setFilters({})}
 				/>
 
+				{selectedIds.length > 0 && (
+					<div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 mb-2">
+						<span className="text-xs font-medium text-muted-foreground">{selectedIds.length} selected</span>
+						<div className="flex flex-wrap items-center gap-2 ml-auto">
+							<Button variant="destructive" size="sm" className="h-8 text-xs" disabled={bulkLoading} onClick={() => void handleBulkDelete()}>Delete Selected</Button>
+							<Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setShowBulkUpdate((v) => !v)}>{showBulkUpdate ? "Cancel" : "Bulk Update"}</Button>
+							{showBulkUpdate && (
+								<>
+									<Select value={bulkOrderStatus} onValueChange={setBulkOrderStatus}><SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Set status" /></SelectTrigger><SelectContent>{orderStatusOptions.map(({ value, label }) => (<SelectItem key={value} value={value} className="text-xs">{label}</SelectItem>))}</SelectContent></Select>
+									<Select value={bulkDeliveryStatus} onValueChange={setBulkDeliveryStatus}><SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Set delivery" /></SelectTrigger><SelectContent><SelectItem value="pending" className="text-xs">Pending</SelectItem><SelectItem value="shipped" className="text-xs">Shipped</SelectItem><SelectItem value="delivered" className="text-xs">Delivered</SelectItem><SelectItem value="failed" className="text-xs">Failed</SelectItem></SelectContent></Select>
+									<Button size="sm" className="h-8 text-xs" disabled={bulkLoading || (!bulkOrderStatus && !bulkDeliveryStatus)} onClick={() => void handleBulkUpdate()}>{bulkLoading ? "Updating..." : "Apply"}</Button>
+								</>
+							)}
+						</div>
+					</div>
+				)}
 				<DataTable
 					data={filteredOrders}
 					columns={columns}

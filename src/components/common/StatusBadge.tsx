@@ -34,7 +34,19 @@ type StatusType =
   | 'good'
   | 'fair'
   | 'available'
-  | 'out_of_stock';
+  | 'out_of_stock'
+  | 'initial_contact'
+  | 'price_shared'
+  | 'google_form_submitted'
+  | 'manual_entry_pending'
+  | 'ready_for_pickup'
+  | 'onboarded'
+  | 'no_items'
+  | 'items_pending_pickup'
+  | 'items_received'
+  | 'items_in_processing'
+  | 'items_listed'
+  | 'partially_listed';
 
 interface StatusBadgeProps {
   status: StatusType | string;
@@ -77,6 +89,22 @@ const statusStyles: Record<string, string> = {
   rejected: 'status-error',
   returned: 'status-error',
   
+  // Seller onboarding states
+  initial_contact: 'status-inactive',
+  price_shared: 'status-pending',
+  google_form_submitted: 'status-pending',
+  manual_entry_pending: 'status-pending',
+  ready_for_pickup: 'bg-chart-3/20 text-chart-3',
+  onboarded: 'status-active',
+
+  // Items onboarding states
+  no_items: 'status-inactive',
+  items_pending_pickup: 'status-pending',
+  items_received: 'bg-chart-3/20 text-chart-3',
+  items_in_processing: 'bg-chart-3/20 text-chart-3',
+  items_listed: 'status-active',
+  partially_listed: 'bg-warning/20 text-warning',
+
   // Special states
   new: 'bg-success/20 text-success',
   like_new: 'bg-success/15 text-success',

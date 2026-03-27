@@ -5,6 +5,7 @@ import { DataTable, Column } from "@/components/common/DataTable";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { DetailPanel } from "@/components/common/DetailPanel";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -45,6 +46,11 @@ export default function TransactionsPage() {
 	const [formDiscountId, setFormDiscountId] = useState("");
 	const [formError, setFormError] = useState<string | null>(null);
 	const [deleteError, setDeleteError] = useState<string | null>(null);
+	const [selectedIds, setSelectedIds] = useState<string[]>([]);
+	const [showBulkUpdate, setShowBulkUpdate] = useState(false);
+	const [bulkTxStatus, setBulkTxStatus] = useState("");
+	const [bulkPaymentMethod, setBulkPaymentMethod] = useState("");
+	const [bulkLoading, setBulkLoading] = useState(false);
 
 	const loadTransactions = useCallback(() => {
 		if (filters.orderId) {
@@ -116,7 +122,31 @@ export default function TransactionsPage() {
 		paymentMethodValues,
 	);
 
+	const safeTransactions = Array.isArray(transactions) ? transactions : [];
+	const filteredTransactions = useMemo(() => {
+		if (!search.trim()) return safeTransactions;
+		const q = search.toLowerCase();
+		return safeTransactions.filter(
+			(tx) =>
+				getRefId(tx.order_id).toLowerCase().includes(q) ||
+				(tx.status ?? "").toLowerCase().includes(q) ||
+				(tx.paymentMethod ?? "").toLowerCase().includes(q),
+		);
+	}, [safeTransactions, search]);
+
+	const allFilteredTxIds = filteredTransactions.map((t) => t._id);
+	const allTxSelected = allFilteredTxIds.length > 0 && allFilteredTxIds.every((id) => selectedIds.includes(id));
+
 	const columns: Column<Transaction>[] = [
+		{
+			key: "_select",
+			header: (
+				<Checkbox checked={allTxSelected} onCheckedChange={(v) => { if (v) setSelectedIds(allFilteredTxIds); else setSelectedIds([]); }} />
+			),
+			render: (tx) => (
+				<Checkbox checked={selectedIds.includes(tx._id)} onCheckedChange={(v) => { setSelectedIds((prev) => v ? [...prev, tx._id] : prev.filter((id) => id !== tx._id)); }} />
+			),
+		},
 		{
 			key: "order_id",
 			header: "Order",
@@ -161,20 +191,33 @@ export default function TransactionsPage() {
 		},
 	];
 
-	const safeTransactions = Array.isArray(transactions) ? transactions : [];
-	const filteredTransactions = useMemo(() => {
-		if (!search.trim()) return safeTransactions;
-		const q = search.toLowerCase();
-		return safeTransactions.filter(
-			(tx) =>
-				getRefId(tx.order_id).toLowerCase().includes(q) ||
-				(tx.status ?? "").toLowerCase().includes(q) ||
-				(tx.paymentMethod ?? "").toLowerCase().includes(q),
-		);
-	}, [safeTransactions, search]);
 
 	const handleFilterChange = (key: string, value: string | undefined) => {
 		setFilters((prev) => ({ ...prev, [key]: value }));
+	};
+
+	const handleBulkDelete = async () => {
+		if (!selectedIds.length) return;
+		setBulkLoading(true);
+		try {
+			await Promise.all(selectedIds.map((id) => restApi.transactions.delete(id)));
+			setSelectedIds([]); await reload();
+		} catch (err) { console.error('Bulk delete failed', err); }
+		finally { setBulkLoading(false); }
+	};
+
+	const handleBulkUpdate = async () => {
+		if (!selectedIds.length || (!bulkTxStatus && !bulkPaymentMethod)) return;
+		setBulkLoading(true);
+		try {
+			const patch: Record<string, string> = {};
+			if (bulkTxStatus) patch.status = bulkTxStatus;
+			if (bulkPaymentMethod) patch.paymentMethod = bulkPaymentMethod;
+			await Promise.all(selectedIds.map((id) => restApi.transactionsExtra.patch(id, patch)));
+			setSelectedIds([]); setShowBulkUpdate(false); setBulkTxStatus(""); setBulkPaymentMethod("");
+			await reload();
+		} catch (err) { console.error('Bulk update failed', err); }
+		finally { setBulkLoading(false); }
 	};
 
 	const handleDelete = async (id: string) => {
@@ -280,6 +323,22 @@ export default function TransactionsPage() {
 					onFilterChange={handleFilterChange}
 					onClearAll={() => setFilters({})}
 				/>
+				{selectedIds.length > 0 && (
+					<div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 mb-2">
+						<span className="text-xs font-medium text-muted-foreground">{selectedIds.length} selected</span>
+						<div className="flex flex-wrap items-center gap-2 ml-auto">
+							<Button variant="destructive" size="sm" className="h-8 text-xs" disabled={bulkLoading} onClick={() => void handleBulkDelete()}>Delete Selected</Button>
+							<Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setShowBulkUpdate((v) => !v)}>{showBulkUpdate ? "Cancel" : "Bulk Update"}</Button>
+							{showBulkUpdate && (
+								<>
+									<Select value={bulkTxStatus} onValueChange={setBulkTxStatus}><SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Set status" /></SelectTrigger><SelectContent>{transactionStatusOptions.map(({ value, label }) => (<SelectItem key={value} value={value} className="text-xs">{label}</SelectItem>))}</SelectContent></Select>
+									<Select value={bulkPaymentMethod} onValueChange={setBulkPaymentMethod}><SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Set payment" /></SelectTrigger><SelectContent>{paymentMethodOptions.map(({ value, label }) => (<SelectItem key={value} value={value} className="text-xs">{label}</SelectItem>))}</SelectContent></Select>
+									<Button size="sm" className="h-8 text-xs" disabled={bulkLoading || (!bulkTxStatus && !bulkPaymentMethod)} onClick={() => void handleBulkUpdate()}>{bulkLoading ? "Updating..." : "Apply"}</Button>
+								</>
+							)}
+						</div>
+					</div>
+				)}
 				<DataTable
 					data={filteredTransactions}
 					columns={columns}

@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { FilterBar } from "@/components/common/FilterBar";
 import { DetailPanel } from "@/components/common/DetailPanel";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -47,6 +48,11 @@ export default function UsersPage() {
 	const [formStatus, setFormStatus] = useState("active");
 	const [formGovernorate, setFormGovernorate] = useState("");
 	const [formCity, setFormCity] = useState("");
+	const [selectedIds, setSelectedIds] = useState<string[]>([]);
+	const [showBulkUpdate, setShowBulkUpdate] = useState(false);
+	const [bulkRole, setBulkRole] = useState("");
+	const [bulkStatus, setBulkStatus] = useState("");
+	const [bulkLoading, setBulkLoading] = useState(false);
 	const loadUsers = useCallback(
 		() =>
 			usersApi.getAll(
@@ -129,7 +135,30 @@ export default function UsersPage() {
 		}
 	}, [showForm, cityOptions, formCity]);
 
+	const filteredUsers = users.filter((user) => {
+		const matchesSearch =
+			search === "" ||
+			(user.emailAddress ?? "").toLowerCase().includes(search.toLowerCase());
+		const matchesStatus =
+			!filters.status ||
+			(filters.status === "active" ? !user.isDeleted : user.isDeleted);
+		const matchesRole = !filters.role || user.roles?.includes(filters.role);
+		return matchesSearch && matchesStatus && matchesRole;
+	});
+
+	const allFilteredUserIds = filteredUsers.map((u) => u._id);
+	const allUsersSelected = allFilteredUserIds.length > 0 && allFilteredUserIds.every((id) => selectedIds.includes(id));
+
 	const columns: Column<User>[] = [
+		{
+			key: "_select",
+			header: (
+				<Checkbox checked={allUsersSelected} onCheckedChange={(v) => { if (v) setSelectedIds(allFilteredUserIds); else setSelectedIds([]); }} />
+			),
+			render: (user) => (
+				<Checkbox checked={selectedIds.includes(user._id)} onCheckedChange={(v) => { setSelectedIds((prev) => v ? [...prev, user._id] : prev.filter((id) => id !== user._id)); }} />
+			),
+		},
 		{
 			key: "emailAddress",
 			header: "Email",
@@ -181,16 +210,6 @@ export default function UsersPage() {
 		},
 	];
 
-	const filteredUsers = users.filter((user) => {
-		const matchesSearch =
-			search === "" ||
-			(user.emailAddress ?? "").toLowerCase().includes(search.toLowerCase());
-		const matchesStatus =
-			!filters.status ||
-			(filters.status === "active" ? !user.isDeleted : user.isDeleted);
-		const matchesRole = !filters.role || user.roles?.includes(filters.role);
-		return matchesSearch && matchesStatus && matchesRole;
-	});
 
 	const handleFilterChange = (key: string, value: string | undefined) => {
 		if (key === "status") {
@@ -204,6 +223,30 @@ export default function UsersPage() {
 
 	const handleClearFilters = () => {
 		setFilters({ status: showDeleted ? "inactive" : "active" });
+	};
+
+	const handleBulkDelete = async () => {
+		if (!selectedIds.length) return;
+		setBulkLoading(true);
+		try {
+			await Promise.all(selectedIds.map((id) => restApi.usersExtra.softDelete(id)));
+			setSelectedIds([]); await reload();
+		} catch (err) { console.error('Bulk delete failed', err); }
+		finally { setBulkLoading(false); }
+	};
+
+	const handleBulkUpdate = async () => {
+		if (!selectedIds.length || (!bulkRole && !bulkStatus)) return;
+		setBulkLoading(true);
+		try {
+			const patch: Record<string, unknown> = {};
+			if (bulkRole) patch.roles = [bulkRole];
+			if (bulkStatus) { patch.isDeleted = bulkStatus === "inactive"; }
+			await Promise.all(selectedIds.map((id) => restApi.usersExtra.patch(id, patch)));
+			setSelectedIds([]); setShowBulkUpdate(false); setBulkRole(""); setBulkStatus("");
+			await reload();
+		} catch (err) { console.error('Bulk update failed', err); }
+		finally { setBulkLoading(false); }
 	};
 
 	const handleDelete = async (id: string) => {
@@ -435,6 +478,22 @@ export default function UsersPage() {
 					<Label htmlFor="show-deleted-users">Show deleted</Label>
 				</div>
 
+				{selectedIds.length > 0 && (
+					<div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 mb-2">
+						<span className="text-xs font-medium text-muted-foreground">{selectedIds.length} selected</span>
+						<div className="flex flex-wrap items-center gap-2 ml-auto">
+							<Button variant="destructive" size="sm" className="h-8 text-xs" disabled={bulkLoading} onClick={() => void handleBulkDelete()}>Delete Selected</Button>
+							<Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setShowBulkUpdate((v) => !v)}>{showBulkUpdate ? "Cancel" : "Bulk Update"}</Button>
+							{showBulkUpdate && (
+								<>
+									<Select value={bulkRole} onValueChange={setBulkRole}><SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="Set role" /></SelectTrigger><SelectContent>{userRoleOptions.map(({ value, label }) => (<SelectItem key={value} value={value} className="text-xs">{label}</SelectItem>))}</SelectContent></Select>
+									<Select value={bulkStatus} onValueChange={setBulkStatus}><SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="Set status" /></SelectTrigger><SelectContent><SelectItem value="active" className="text-xs">Active</SelectItem><SelectItem value="inactive" className="text-xs">Inactive</SelectItem></SelectContent></Select>
+									<Button size="sm" className="h-8 text-xs" disabled={bulkLoading || (!bulkRole && !bulkStatus)} onClick={() => void handleBulkUpdate()}>{bulkLoading ? "Updating..." : "Apply"}</Button>
+								</>
+							)}
+						</div>
+					</div>
+				)}
 				<DataTable
 					data={filteredUsers}
 					columns={columns}

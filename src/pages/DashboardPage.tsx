@@ -1,10 +1,10 @@
 import { useCallback, useMemo } from "react";
 import {
-	DollarSign,
 	ShoppingCart,
 	Users,
 	Package,
 	TrendingUp,
+	Store,
 } from "lucide-react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -243,6 +243,15 @@ export default function DashboardPage() {
 			})
 			.reduce((sum, sale) => sum + getSaleCommission(sale), 0);
 
+		const totalSellers = sellers.length;
+		const currentSellers = sellers.filter(
+			(s) => new Date(s.createdAt) >= sevenDaysAgo,
+		).length;
+		const previousSellers = sellers.filter((s) => {
+			const created = new Date(s.createdAt);
+			return created >= fourteenDaysAgo && created < sevenDaysAgo;
+		}).length;
+
 		return {
 			totalRevenue,
 			revenueChange: percentChange(currentRevenue, previousRevenue),
@@ -252,8 +261,10 @@ export default function DashboardPage() {
 			usersChange: percentChange(currentUsers, previousUsers),
 			totalItems,
 			itemsChange: percentChange(currentItems, previousItems),
+			totalSellers,
+			sellersChange: percentChange(currentSellers, previousSellers),
 		};
-	}, [items, orders, sales, users]);
+	}, [items, orders, sales, sellers, users]);
 
 	const revenueData = useMemo(() => {
 		const now = new Date();
@@ -473,7 +484,7 @@ export default function DashboardPage() {
 					</div>
 				)}
 				{/* KPI Cards */}
-				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
 					<KpiCard
 						title="Total Revenue"
 						value={dashboardKpis.totalRevenue}
@@ -502,6 +513,13 @@ export default function DashboardPage() {
 						change={dashboardKpis.itemsChange}
 						trend="down"
 						icon={<Package className="h-5 w-5" />}
+					/>
+					<KpiCard
+						title="Total Sellers"
+						value={dashboardKpis.totalSellers}
+						change={dashboardKpis.sellersChange}
+						trend="up"
+						icon={<Store className="h-5 w-5" />}
 					/>
 				</div>
 

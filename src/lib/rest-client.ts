@@ -362,6 +362,8 @@ export const restApi = {
 	},
 	usersExtra: {
 		/** Soft-delete user (set isDeleted: true). Use this for the Delete button. Seller updates: use PATCH /api/sellers/{id} only (id = seller _id or user ID). */
+		patch: (id: string, data: Record<string, unknown>) =>
+		apiRequest(`${endpoints.users}/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
 		softDelete: (id: string) =>
 			apiRequest<unknown>(`${endpoints.users}/${id}`, {
 				method: "PATCH",
@@ -396,6 +398,8 @@ export const restApi = {
 			),
 	},
 	transactionsExtra: {
+		patch: (id: string, data: Record<string, unknown>) =>
+			apiRequest(`${endpoints.transactions}/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
 		/** GET /api/transactions/order/{orderId} — list transactions by order (OpenAPI). */
 		getByOrderId: (
 			orderId: string,
