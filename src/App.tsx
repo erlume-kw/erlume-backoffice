@@ -21,6 +21,8 @@ const ReviewsPage = lazy(() => import("./pages/ReviewsPage"));
 const SubCategoriesPage = lazy(() => import("./pages/SubCategoriesPage"));
 const CreditCardsPage = lazy(() => import("./pages/CreditCardsPage"));
 const OutfitItemsPage = lazy(() => import("./pages/OutfitItemsPage"));
+const ShippingPage = lazy(() => import("./pages/ShippingPage"));
+const NewsletterPage = lazy(() => import("./pages/NewsletterPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -55,6 +57,8 @@ const App = () => (
 						<Route path="/subcategories" element={<SubCategoriesPage />} />
 						<Route path="/creditcards" element={<CreditCardsPage />} />
 						<Route path="/outfititems" element={<OutfitItemsPage />} />
+						<Route path="/shipping" element={<ShippingPage />} />
+						<Route path="/newsletter" element={<NewsletterPage />} />
 						<Route path="*" element={<NotFound />} />
 					</Routes>
 				</Suspense>

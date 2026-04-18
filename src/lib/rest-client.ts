@@ -5,10 +5,12 @@ import type {
 	Employee,
 	Expense,
 	Income,
+	NewsletterSubscriber,
 	Order,
 	OrderItem,
 	OutfitItem,
 	Sale,
+	ShippingMethod,
 	SubCategory,
 	Transaction,
 } from "@/types/models";
@@ -430,6 +432,28 @@ export const restApi = {
 			apiRequest<void>(
 				`${endpoints.drops}/${id}${options?.removeItems ? "?removeItems=true" : ""}`,
 				{ method: "DELETE" },
+			),
+	},
+	shipping: {
+		getAll: () => apiRequest<ShippingMethod[]>(endpoints.shipping),
+		getById: (id: string) => apiRequest<ShippingMethod>(`${endpoints.shipping}/${id}`),
+		create: (data: Record<string, unknown>) =>
+			apiRequest<ShippingMethod>(endpoints.shipping, {
+				method: "POST",
+				body: JSON.stringify(data),
+			}),
+		update: (id: string, data: Record<string, unknown>) =>
+			apiRequest<ShippingMethod>(`${endpoints.shipping}/${id}`, {
+				method: "PUT",
+				body: JSON.stringify(data),
+			}),
+		delete: (id: string) =>
+			apiRequest<void>(`${endpoints.shipping}/${id}`, { method: "DELETE" }),
+	},
+	newsletter: {
+		getAll: (includeInactive?: boolean) =>
+			apiRequest<NewsletterSubscriber[]>(
+				`${endpoints.newsletter}${includeInactive ? "?includeInactive=true" : ""}`,
 			),
 	},
 };

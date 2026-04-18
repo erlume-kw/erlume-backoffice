@@ -42,4 +42,6 @@ export const endpoints = {
 	employees: `${API_BASE_URL}/employees`,
 	/** GET /api/enums, GET /api/enums/{category} — OpenAPI Enums (orderStatus, itemStatus, bagBrand, kuwaitGovernorate, kuwaitCity, etc.) */
 	enums: `${API_BASE_URL}/enums`,
+	shipping: `${API_BASE_URL}/shipping`,
+	newsletter: `${API_BASE_URL}/newsletter`,
 } as const;

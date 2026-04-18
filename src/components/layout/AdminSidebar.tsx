@@ -17,6 +17,8 @@ import {
 	FileText,
 	Receipt,
 	Briefcase,
+	Truck,
+	Mail,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
@@ -39,6 +41,8 @@ const navigation = [
 	{ name: "Drops", href: "/drops", icon: Zap },
 	{ name: "Discount Codes", href: "/discounts", icon: Ticket },
 	{ name: "Reviews", href: "/reviews", icon: Star },
+	{ name: "Shipping", href: "/shipping", icon: Truck },
+	{ name: "Newsletter", href: "/newsletter", icon: Mail },
 ];
 
 export function AdminSidebar() {

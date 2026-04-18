@@ -312,3 +312,23 @@ export interface TableFilters {
 	sortBy?: string;
 	sortOrder?: "asc" | "desc";
 }
+
+export interface ShippingMethod {
+	_id: string;
+	name: string;
+	description?: string;
+	price: number;
+	zones: string[]; // Kuwait governorate names; empty = all zones
+	isActive: boolean;
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface NewsletterSubscriber {
+	_id: string;
+	email: string;
+	subscribedAt: string;
+	isActive: boolean;
+	createdAt: string;
+	updatedAt: string;
+}
