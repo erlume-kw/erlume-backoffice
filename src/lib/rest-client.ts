@@ -1,4 +1,6 @@
 import { endpoints } from "./api-config";
+import { API_BASE_URL } from "./api-config";
+import { getToken } from "./auth";
 import type {
 	CreditCard,
 	DiscountCode,
@@ -38,9 +40,11 @@ async function apiRequest<T>(
 	endpoint: string,
 	options: RequestInit = {},
 ): Promise<T> {
+	const token = getToken();
 	const response = await fetch(endpoint, {
 		headers: {
 			"Content-Type": "application/json",
+			...(token ? { Authorization: `Bearer ${token}` } : {}),
 			...options.headers,
 		},
 		...options,
@@ -459,6 +463,35 @@ export const restApi = {
 };
 
 export default restApi;
+
+// ─── File upload ──────────────────────────────────────────────────────────────
+
+export type UploadFolder = "items" | "receipts" | "price-estimators" | "quotes";
+
+export async function uploadFile(
+	file: File,
+	folder: UploadFolder = "items",
+): Promise<{ url: string; publicId: string }> {
+	const token = getToken();
+	const body = new FormData();
+	body.append("file", file);
+	body.append("folder", folder);
+
+	const res = await fetch(`${API_BASE_URL}/upload`, {
+		method: "POST",
+		headers: {
+			...(token ? { Authorization: `Bearer ${token}` } : {}),
+			// Do NOT set Content-Type — browser sets it with the multipart boundary
+		},
+		body,
+	});
+
+	const data = await res.json();
+	if (!res.ok || !data.url) {
+		throw new Error(data.error || "Upload failed");
+	}
+	return { url: data.url, publicId: data.publicId };
+}
 
 // Export ApiError for use in pages/components
 export { ApiError } from "./api-errors";

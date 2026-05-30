@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
 	LayoutDashboard,
 	Users,
@@ -19,10 +19,12 @@ import {
 	Briefcase,
 	Truck,
 	Mail,
+	LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/context/AuthContext";
 import logoUrl from "../../../erlume_Icon_1_Transparent_green.png";
 
 const navigation = [
@@ -47,6 +49,8 @@ const navigation = [
 
 export function AdminSidebar() {
 	const location = useLocation();
+	const navigate = useNavigate();
+	const { logout } = useAuth();
 	const [collapsed, setCollapsed] = useState(false);
 	const [mobileOpen, setMobileOpen] = useState(false);
 	const [isDesktop, setIsDesktop] = useState(() =>
@@ -119,8 +123,8 @@ export function AdminSidebar() {
 				</div>
 
 				{/* Navigation */}
-				<nav className="flex-1 overflow-y-auto py-4 px-2">
-					<ul className="space-y-1">
+				<nav className="flex flex-col h-[calc(100vh-4rem)] py-4 px-2">
+					<ul className="flex-1 space-y-1 overflow-y-auto">
 						{navigation.map((item) => {
 							const isActive = location.pathname === item.href;
 							return (
@@ -140,6 +144,19 @@ export function AdminSidebar() {
 							);
 						})}
 					</ul>
+					<div className="pt-2 border-t border-sidebar-border">
+						<button
+							type="button"
+							onClick={() => { logout(); navigate("/login"); }}
+							className={cn(
+								"sidebar-link w-full text-muted-foreground hover:text-destructive",
+								isCompact ? "justify-center" : "",
+							)}
+							title={isCompact ? "Sign out" : undefined}>
+							<LogOut className="h-5 w-5 flex-shrink-0" />
+							{!isCompact && <span>Sign out</span>}
+						</button>
+					</div>
 				</nav>
 			</aside>
 		</>

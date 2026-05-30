@@ -2,6 +2,8 @@ import { lazy, Suspense } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "@/context/AuthContext";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
@@ -33,35 +35,39 @@ const routeFallback = (
 	</div>
 );
 
+const protect = (el: JSX.Element) => <ProtectedRoute>{el}</ProtectedRoute>;
+
 const App = () => (
 	<QueryClientProvider client={queryClient}>
 		<TooltipProvider>
 			<BrowserRouter>
-				<Suspense fallback={routeFallback}>
-					<Routes>
-						<Route path="/login" element={<LoginPage />} />
-						<Route path="/" element={<DashboardPage />} />
-						<Route path="/users" element={<UsersPage />} />
-						<Route path="/sellers" element={<SellersPage />} />
-						<Route path="/items" element={<ItemsPage />} />
-						<Route path="/orders" element={<OrdersPage />} />
-						<Route path="/transactions" element={<TransactionsPage />} />
-						<Route path="/incomes" element={<IncomesPage />} />
-						<Route path="/sales" element={<SalesPage />} />
-						<Route path="/expenses" element={<ExpensesPage />} />
-						<Route path="/employees" element={<EmployeesPage />} />
-						<Route path="/categories" element={<CategoriesPage />} />
-						<Route path="/drops" element={<DropsPage />} />
-						<Route path="/discounts" element={<DiscountsPage />} />
-						<Route path="/reviews" element={<ReviewsPage />} />
-						<Route path="/subcategories" element={<SubCategoriesPage />} />
-						<Route path="/creditcards" element={<CreditCardsPage />} />
-						<Route path="/outfititems" element={<OutfitItemsPage />} />
-						<Route path="/shipping" element={<ShippingPage />} />
-						<Route path="/newsletter" element={<NewsletterPage />} />
-						<Route path="*" element={<NotFound />} />
-					</Routes>
-				</Suspense>
+				<AuthProvider>
+					<Suspense fallback={routeFallback}>
+						<Routes>
+							<Route path="/login" element={<LoginPage />} />
+							<Route path="/" element={protect(<DashboardPage />)} />
+							<Route path="/users" element={protect(<UsersPage />)} />
+							<Route path="/sellers" element={protect(<SellersPage />)} />
+							<Route path="/items" element={protect(<ItemsPage />)} />
+							<Route path="/orders" element={protect(<OrdersPage />)} />
+							<Route path="/transactions" element={protect(<TransactionsPage />)} />
+							<Route path="/incomes" element={protect(<IncomesPage />)} />
+							<Route path="/sales" element={protect(<SalesPage />)} />
+							<Route path="/expenses" element={protect(<ExpensesPage />)} />
+							<Route path="/employees" element={protect(<EmployeesPage />)} />
+							<Route path="/categories" element={protect(<CategoriesPage />)} />
+							<Route path="/drops" element={protect(<DropsPage />)} />
+							<Route path="/discounts" element={protect(<DiscountsPage />)} />
+							<Route path="/reviews" element={protect(<ReviewsPage />)} />
+							<Route path="/subcategories" element={protect(<SubCategoriesPage />)} />
+							<Route path="/creditcards" element={protect(<CreditCardsPage />)} />
+							<Route path="/outfititems" element={protect(<OutfitItemsPage />)} />
+							<Route path="/shipping" element={protect(<ShippingPage />)} />
+							<Route path="/newsletter" element={protect(<NewsletterPage />)} />
+							<Route path="*" element={<NotFound />} />
+						</Routes>
+					</Suspense>
+				</AuthProvider>
 			</BrowserRouter>
 		</TooltipProvider>
 	</QueryClientProvider>

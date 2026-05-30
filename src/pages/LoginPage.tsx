@@ -1,4 +1,5 @@
-import { FormEvent } from "react";
+import { FormEvent, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -9,11 +10,30 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/context/AuthContext";
 import logoUrl from "../../erlume_Icon_1_Transparent_green.png";
 
 export default function LoginPage() {
-	const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+	const { login } = useAuth();
+	const navigate = useNavigate();
+	const [error, setError] = useState("");
+	const [loading, setLoading] = useState(false);
+
+	const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
+		const form = event.currentTarget;
+		const email = (form.elements.namedItem("email") as HTMLInputElement).value;
+		const password = (form.elements.namedItem("password") as HTMLInputElement).value;
+		setLoading(true);
+		setError("");
+		try {
+			await login(email, password);
+			navigate("/");
+		} catch (err: unknown) {
+			setError(err instanceof Error ? err.message : "Login failed");
+		} finally {
+			setLoading(false);
+		}
 	};
 
 	return (
@@ -41,22 +61,29 @@ export default function LoginPage() {
 							<Label htmlFor="email">Email</Label>
 							<Input
 								id="email"
+								name="email"
 								type="email"
 								placeholder="admin@erlume.com"
 								required
+								disabled={loading}
 							/>
 						</div>
 						<div className="space-y-2">
 							<Label htmlFor="password">Password</Label>
 							<Input
 								id="password"
+								name="password"
 								type="password"
 								placeholder="Enter your password"
 								required
+								disabled={loading}
 							/>
 						</div>
-						<Button type="submit" className="w-full">
-							Sign in
+						{error && (
+							<p className="text-sm text-destructive">{error}</p>
+						)}
+						<Button type="submit" className="w-full" disabled={loading}>
+							{loading ? "Signing in…" : "Sign in"}
 						</Button>
 						<p className="text-xs text-muted-foreground text-center">
 							Contact your system administrator if you need access.

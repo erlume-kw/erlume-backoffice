@@ -5,11 +5,11 @@ import { DataTable, Column } from "@/components/common/DataTable";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { FilterBar } from "@/components/common/FilterBar";
 import { DetailPanel } from "@/components/common/DetailPanel";
+import ImageUploader from "@/components/common/ImageUploader";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
 	Select,
 	SelectContent,
@@ -60,6 +60,10 @@ export default function ItemsPage() {
 	const [formBrand, setFormBrand] = useState("");
 	const [brandSearch, setBrandSearch] = useState("");
 	const [formError, setFormError] = useState<string | null>(null);
+	const [formImageUrls, setFormImageUrls] = useState<string[]>([]);
+	const [formReceiptUrls, setFormReceiptUrls] = useState<string[]>([]);
+	const [formPriceEstimatorUrls, setFormPriceEstimatorUrls] = useState<string[]>([]);
+	const [formQuoteUrls, setFormQuoteUrls] = useState<string[]>([]);
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
 	const [showBulkUpdate, setShowBulkUpdate] = useState(false);
 	const [bulkStatus, setBulkStatus] = useState("");
@@ -443,22 +447,10 @@ export default function ItemsPage() {
 		const quantity = String(formData.get("quantity") ?? "").trim();
 		const yearValue = String(formData.get("year") ?? "").trim();
 		const listingPriceValue = String(formData.get("listingPrice") ?? "").trim();
-		const imageUrls = String(formData.get("imageUrls") || "")
-			.split(/\s+/)
-			.map((value) => value.trim())
-			.filter(Boolean);
-		const receiptPhotoUrls = String(formData.get("receiptPhotoUrls") || "")
-			.split(/\s+/)
-			.map((value) => value.trim())
-			.filter(Boolean);
-		const priceEstimatorUrls = String(formData.get("priceEstimatorUrls") || "")
-			.split(/\s+/)
-			.map((value) => value.trim())
-			.filter(Boolean);
-		const quoteUrls = String(formData.get("quoteUrls") || "")
-			.split(/\s+/)
-			.map((value) => value.trim())
-			.filter(Boolean);
+		const imageUrls = formImageUrls;
+		const receiptPhotoUrls = formReceiptUrls;
+		const priceEstimatorUrls = formPriceEstimatorUrls;
+		const quoteUrls = formQuoteUrls;
 
 		const itemNameVal = String(formData.get("itemName") || "").trim();
 		const brandNameVal = (
@@ -586,6 +578,10 @@ export default function ItemsPage() {
 					setFormSubCategoryId(undefined);
 					setFormBrand("");
 					setBrandSearch("");
+					setFormImageUrls([]);
+					setFormReceiptUrls([]);
+					setFormPriceEstimatorUrls([]);
+					setFormQuoteUrls([]);
 					setShowForm(true);
 				}}
 				addLabel="Add Item"
@@ -756,6 +752,10 @@ export default function ItemsPage() {
 						setSellerSearch("");
 						setFormCategoryId(item.category_id);
 						setFormSubCategoryId(item.sub_category_id ?? undefined);
+						setFormImageUrls(item.imageUrls ?? []);
+						setFormReceiptUrls(item.receiptPhotoUrls ?? []);
+						setFormPriceEstimatorUrls(item.priceEstimatorUrls ?? []);
+						setFormQuoteUrls(item.quoteUrls ?? []);
 						setShowForm(true);
 					}}
 					onDelete={(item) => {
@@ -1481,60 +1481,54 @@ export default function ItemsPage() {
 									<CardHeader className="py-3 px-4">
 										<CardTitle className="text-base">Media & URLs</CardTitle>
 										<p className="text-xs text-muted-foreground mt-0.5">
-											Paste image or Google Drive links (one per line).
+											Upload images or PDFs directly to Cloudinary.
 										</p>
 									</CardHeader>
 									<CardContent className="pt-0 px-4 pb-4 space-y-4">
 										<div className="space-y-2">
-											<Label htmlFor="imageUrls">Image URLs</Label>
-											<Textarea
-												id="imageUrls"
-												name="imageUrls"
-												rows={3}
-												defaultValue={editingItem?.imageUrls?.join("\n")}
-												placeholder="Paste links (e.g. Google Drive share links), one per line or space-separated"
-												className="resize-y min-h-[80px]"
+											<Label>Item Images <span className="text-destructive">*</span></Label>
+											<ImageUploader
+												folder="items"
+												defaultUrls={formImageUrls}
+												onChange={setFormImageUrls}
+												multiple={true}
+												accept="image/jpeg,image/png,image/webp,image/gif"
+												label="Upload images"
 											/>
 										</div>
 										<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 											<div className="space-y-2 min-w-0">
-												<Label
-													htmlFor="receiptPhotoUrls"
-													className="break-words">
-													Receipt photo URLs
-												</Label>
-												<Input
-													id="receiptPhotoUrls"
-													name="receiptPhotoUrls"
-													defaultValue={editingItem?.receiptPhotoUrls?.join(
-														" ",
-													)}
-													placeholder="Space-separated"
+												<Label>Receipt Photos</Label>
+												<ImageUploader
+													folder="receipts"
+													defaultUrls={formReceiptUrls}
+													onChange={setFormReceiptUrls}
+													multiple={true}
+													accept="image/jpeg,image/png,image/webp,application/pdf"
+													label="Upload receipts"
 												/>
 											</div>
 											<div className="space-y-2 min-w-0">
-												<Label
-													htmlFor="priceEstimatorUrls"
-													className="break-words">
-													Price estimator URLs
-												</Label>
-												<Input
-													id="priceEstimatorUrls"
-													name="priceEstimatorUrls"
-													defaultValue={editingItem?.priceEstimatorUrls?.join(
-														" ",
-													)}
-													placeholder="Space-separated"
+												<Label>Price Estimators</Label>
+												<ImageUploader
+													folder="price-estimators"
+													defaultUrls={formPriceEstimatorUrls}
+													onChange={setFormPriceEstimatorUrls}
+													multiple={true}
+													accept="image/jpeg,image/png,image/webp,application/pdf"
+													label="Upload estimators"
 												/>
 											</div>
 										</div>
 										<div className="space-y-2">
-											<Label htmlFor="quoteUrls">Quote URLs</Label>
-											<Input
-												id="quoteUrls"
-												name="quoteUrls"
-												defaultValue={editingItem?.quoteUrls?.join(" ")}
-												placeholder="Space-separated"
+											<Label>Quote Documents</Label>
+											<ImageUploader
+												folder="quotes"
+												defaultUrls={formQuoteUrls}
+												onChange={setFormQuoteUrls}
+												multiple={true}
+												accept="image/jpeg,image/png,image/webp,application/pdf"
+												label="Upload quotes"
 											/>
 										</div>
 									</CardContent>
