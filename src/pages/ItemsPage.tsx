@@ -71,7 +71,7 @@ export default function ItemsPage() {
 	const [bulkCategory, setBulkCategory] = useState("");
 	const [bulkLoading, setBulkLoading] = useState(false);
 	const loadItems = useCallback(
-		() => restApi.items.getAll() as Promise<Item[]>,
+		() => restApi.items.getAll({ limit: 500 }) as Promise<Item[]>,
 		[],
 	);
 	const loadDrops = useCallback(
@@ -1442,7 +1442,7 @@ export default function ItemsPage() {
 												</SelectItem>
 											)}
 											{filteredSellers.map((seller) => (
-												<SelectItem key={seller._id} value={seller._id}>
+												<SelectItem key={seller._id} value={getSellerUserId(seller)}>
 													{sellerLabelById.get(seller._id) ?? seller._id}
 												</SelectItem>
 											))}
@@ -1492,7 +1492,7 @@ export default function ItemsPage() {
 												defaultUrls={formImageUrls}
 												onChange={setFormImageUrls}
 												multiple={true}
-												accept="image/jpeg,image/png,image/webp,image/gif"
+												accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif"
 												label="Upload images"
 											/>
 										</div>
@@ -1504,7 +1504,7 @@ export default function ItemsPage() {
 													defaultUrls={formReceiptUrls}
 													onChange={setFormReceiptUrls}
 													multiple={true}
-													accept="image/jpeg,image/png,image/webp,application/pdf"
+													accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf"
 													label="Upload receipts"
 												/>
 											</div>
@@ -1515,7 +1515,7 @@ export default function ItemsPage() {
 													defaultUrls={formPriceEstimatorUrls}
 													onChange={setFormPriceEstimatorUrls}
 													multiple={true}
-													accept="image/jpeg,image/png,image/webp,application/pdf"
+													accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf"
 													label="Upload estimators"
 												/>
 											</div>
@@ -1527,7 +1527,7 @@ export default function ItemsPage() {
 												defaultUrls={formQuoteUrls}
 												onChange={setFormQuoteUrls}
 												multiple={true}
-												accept="image/jpeg,image/png,image/webp,application/pdf"
+												accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf"
 												label="Upload quotes"
 											/>
 										</div>

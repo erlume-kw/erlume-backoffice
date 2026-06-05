@@ -26,6 +26,7 @@ import type {
 import { DateTimePicker } from "@/components/ui/date-picker";
 import { Package, Calendar, User as UserIcon } from "lucide-react";
 import { restApi } from "@/lib/rest-client";
+import { API_BASE_URL } from "@/lib/api-config";
 import { getEnumOptions, getEnumValues } from "@/lib/enums";
 import { useResourceList } from "@/hooks/use-resource-list";
 
@@ -48,6 +49,19 @@ export default function OrdersPage() {
 	const [orderItemsInitialized, setOrderItemsInitialized] = useState(false);
 	const [formUserId, setFormUserId] = useState("");
 	const [userSearch, setUserSearch] = useState("");
+	const [orderType, setOrderType] = useState<"registered" | "guest">("registered");
+	const [guestName, setGuestName] = useState("");
+	const [guestPhone, setGuestPhone] = useState("");
+	const [guestEmail, setGuestEmail] = useState("");
+	const [guestStreet, setGuestStreet] = useState("");
+	const [guestCity, setGuestCity] = useState("");
+	const [guestBlock, setGuestBlock] = useState("");
+	const [guestGovernorate, setGuestGovernorate] = useState("");
+	const [guestHouse, setGuestHouse] = useState("");
+	const [guestFlat, setGuestFlat] = useState("");
+	const [governorateOptions, setGovernorateOptions] = useState<string[]>([]);
+	const [cityOptions, setCityOptions] = useState<string[]>([]);
+	const [governorateCitiesMap, setGovernorateCitiesMap] = useState<Record<string, string[]>>({});
 	const [formDiscountId, setFormDiscountId] = useState("");
 	const [formDeliveryDate, setFormDeliveryDate] = useState<Date | undefined>(
 		undefined,
@@ -65,6 +79,26 @@ export default function OrdersPage() {
 		() => restApi.enums.getByCategory("orderStatus"),
 		[],
 	);
+	// Load Kuwait governorates & cities once on mount
+	const loadKuwaitEnums = useCallback(async () => {
+		try {
+			// getByCategory already returns string[] — use directly
+			const govs = await restApi.enums.getByCategory("kuwaitGovernorate");
+			setGovernorateOptions(govs);
+
+			// kwaitGovernorateCities needs raw fetch — getByCategory can't handle its structure
+			const res = await fetch(`${API_BASE_URL}/enums/kuwaitGovernorateCities`);
+			const json = await res.json();
+			const raw = json.data ?? json;
+			const map: Record<string, string[]> = {};
+			for (const [gov, val] of Object.entries(raw as Record<string, any>)) {
+				map[gov] = (val as any).cityValues ?? (val as any).cities?.map((c: any) => c.value ?? c) ?? [];
+			}
+			setGovernorateCitiesMap(map);
+		} catch (err) {
+			console.error("Failed to load Kuwait enums:", err);
+		}
+	}, []);
 	const loadUsers = useCallback(
 		() => restApi.users.getAll() as Promise<User[]>,
 		[],
@@ -88,6 +122,7 @@ export default function OrdersPage() {
 	const { data: items } = useResourceList<Item>(loadItems);
 	const { data: discountCodes } =
 		useResourceList<DiscountCode>(loadDiscountCodes);
+	useEffect(() => { void loadKuwaitEnums(); }, [loadKuwaitEnums]);
 	const userLabelById = useMemo(
 		() =>
 			new Map(
@@ -108,6 +143,10 @@ export default function OrdersPage() {
 	};
 	const getUserIdValue = (userId: Order["user_id"]) => {
 		return getRefId(userId);
+	};
+	const getOrderCustomerLabel = (order: Order): string => {
+		if (order.guestInfo?.name) return `${order.guestInfo.name} (Guest)`;
+		return getUserLabel(order.user_id);
 	};
 	const getUserLabel = (userId: Order["user_id"]) => {
 		if (typeof userId === "string") {
@@ -274,7 +313,7 @@ export default function OrdersPage() {
 	]);
 
 	const filteredOrders = orders.filter((order) => {
-		const customerLabel = getUserLabel(order.user_id);
+		const customerLabel = getOrderCustomerLabel(order);
 		const orderUserId = getUserIdValue(order.user_id);
 		const matchesSearch =
 			search === "" ||
@@ -341,7 +380,7 @@ export default function OrdersPage() {
 			header: "Customer",
 			render: (order) => (
 				<span className="text-muted-foreground">
-					{getUserLabel(order.user_id)}
+					{getOrderCustomerLabel(order)}
 				</span>
 			),
 		},
@@ -479,9 +518,15 @@ export default function OrdersPage() {
 		setFormError(null);
 		const formData = new FormData(event.currentTarget);
 		const user_id = formUserId;
-		if (!user_id && !editingOrder) {
-			setFormError("User is required to create an order.");
-			return;
+		if (!editingOrder) {
+			if (orderType === "registered" && !user_id) {
+				setFormError("Please select a user.");
+				return;
+			}
+			if (orderType === "guest" && (!guestName || !guestPhone || !guestStreet || !guestCity || !guestBlock || !guestGovernorate || !guestHouse)) {
+				setFormError("Please fill in all required guest fields.");
+				return;
+			}
 		}
 		const selectedItems = Object.entries(orderItemSelections)
 			.filter(([, value]) => value.selected)
@@ -523,11 +568,28 @@ export default function OrdersPage() {
 						: current,
 				);
 			} else {
-				let createdOrder = await restApi.orders.create({
-					user_id,
+				const orderPayload: Record<string, unknown> = {
 					order_status,
 					orderItems: selectedItems,
-				});
+				};
+				if (orderType === "guest") {
+					orderPayload.guestInfo = {
+						name: guestName,
+						phoneNumber: guestPhone,
+						...(guestEmail && { emailAddress: guestEmail }),
+						shippingAddress: {
+							street: guestStreet,
+							city: guestCity,
+							block: guestBlock,
+							governorate: guestGovernorate,
+							house: guestHouse,
+							...(guestFlat && { flat: guestFlat }),
+						},
+					};
+				} else {
+					orderPayload.user_id = user_id;
+				}
+				let createdOrder = await restApi.orders.create(orderPayload as any);
 				if (!createdOrder || !createdOrder._id) {
 					// If response is empty but creation succeeded (201), try to find the order
 					// Wait a bit for the database to be consistent
@@ -627,6 +689,10 @@ export default function OrdersPage() {
 					setShowSelectedOnly(false);
 					setFormUserId("");
 					setUserSearch("");
+					setOrderType("registered");
+					setGuestName(""); setGuestPhone(""); setGuestEmail("");
+					setGuestStreet(""); setGuestCity(""); setGuestBlock("");
+					setGuestGovernorate(""); setGuestHouse(""); setGuestFlat("");
 					setExistingOrderItems([]);
 					setOrderItemsInitialized(false);
 					setShowForm(true);
@@ -776,13 +842,29 @@ export default function OrdersPage() {
 						<div className="space-y-3">
 							<div className="flex items-center gap-3 text-muted-foreground">
 								<UserIcon className="h-4 w-4" />
-								<span>User ID</span>
-								<span className="font-mono text-sm">
-									{getUserIdValue(selectedOrder.user_id)}
-								</span>
-								<span className="text-xs text-muted-foreground">
-									{getUserLabel(selectedOrder.user_id)}
-								</span>
+								<span>Customer</span>
+								{selectedOrder.guestInfo ? (
+									<div className="text-sm">
+										<p className="font-medium text-foreground">{selectedOrder.guestInfo.name} <span className="text-xs text-muted-foreground">(Guest)</span></p>
+										<p>{selectedOrder.guestInfo.phoneNumber}</p>
+										{selectedOrder.guestInfo.emailAddress && <p>{selectedOrder.guestInfo.emailAddress}</p>}
+										<p className="text-xs mt-1">
+											{[
+												selectedOrder.guestInfo.shippingAddress.house,
+												selectedOrder.guestInfo.shippingAddress.street,
+												selectedOrder.guestInfo.shippingAddress.block,
+												selectedOrder.guestInfo.shippingAddress.city,
+												selectedOrder.guestInfo.shippingAddress.governorate,
+											].filter(Boolean).join(", ")}
+											{selectedOrder.guestInfo.shippingAddress.flat && `, Flat ${selectedOrder.guestInfo.shippingAddress.flat}`}
+										</p>
+									</div>
+								) : (
+									<>
+										<span className="font-mono text-sm">{getUserIdValue(selectedOrder.user_id)}</span>
+										<span className="text-xs text-muted-foreground">{getUserLabel(selectedOrder.user_id)}</span>
+									</>
+								)}
 							</div>
 							<div className="flex items-center gap-3 text-muted-foreground">
 								<Package className="h-4 w-4" />
@@ -858,6 +940,10 @@ export default function OrdersPage() {
 					setFormUserId("");
 					setFormDiscountId("");
 					setUserSearch("");
+					setOrderType("registered");
+					setGuestName(""); setGuestPhone(""); setGuestEmail("");
+					setGuestStreet(""); setGuestCity(""); setGuestBlock("");
+					setGuestGovernorate(""); setGuestHouse(""); setGuestFlat("");
 					setExistingOrderItems([]);
 					setOrderItemsInitialized(false);
 				}}
@@ -869,32 +955,114 @@ export default function OrdersPage() {
 						<div className="text-sm text-destructive">{formError}</div>
 					)}
 					{!editingOrder && (
-						<div className="space-y-2">
-							<Label>User</Label>
-							<Input
-								value={userSearch}
-								onChange={(event) => setUserSearch(event.target.value)}
-								placeholder="Search users..."
-							/>
-							<Select
-								value={formUserId}
-								onValueChange={(value) => setFormUserId(value)}>
-								<SelectTrigger>
-									<SelectValue placeholder="Select user" />
-								</SelectTrigger>
-								<SelectContent>
-									{filteredUsers.length === 0 && (
-										<SelectItem value="__none__" disabled>
-											No users found
-										</SelectItem>
-									)}
-									{filteredUsers.map((user) => (
-										<SelectItem key={user._id} value={user._id}>
-											{userLabelById.get(user._id)}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
+						<div className="space-y-3">
+							{/* Order type toggle */}
+							<div className="flex rounded-md border border-input overflow-hidden">
+								<button
+									type="button"
+									onClick={() => setOrderType("registered")}
+									className={`flex-1 py-2 text-sm font-medium transition-colors ${orderType === "registered" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}>
+									Registered User
+								</button>
+								<button
+									type="button"
+									onClick={() => setOrderType("guest")}
+									className={`flex-1 py-2 text-sm font-medium transition-colors ${orderType === "guest" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}>
+									Guest
+								</button>
+							</div>
+
+							{orderType === "registered" && (
+								<div className="space-y-2">
+									<Input
+										value={userSearch}
+										onChange={(event) => setUserSearch(event.target.value)}
+										placeholder="Search users..."
+									/>
+									<Select value={formUserId} onValueChange={(value) => setFormUserId(value)}>
+										<SelectTrigger>
+											<SelectValue placeholder="Select user" />
+										</SelectTrigger>
+										<SelectContent>
+											{filteredUsers.length === 0 && (
+												<SelectItem value="__none__" disabled>No users found</SelectItem>
+											)}
+											{filteredUsers.map((user) => (
+												<SelectItem key={user._id} value={user._id}>
+													{userLabelById.get(user._id)}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+								</div>
+							)}
+
+							{orderType === "guest" && (
+								<div className="space-y-3">
+									<div className="grid grid-cols-2 gap-2">
+										<div className="space-y-1">
+											<Label className="text-xs">Name *</Label>
+											<Input value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="Full name" />
+										</div>
+										<div className="space-y-1">
+											<Label className="text-xs">Phone *</Label>
+											<Input value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} placeholder="+96512345678" />
+										</div>
+									</div>
+									<div className="space-y-1">
+										<Label className="text-xs">Email (optional)</Label>
+										<Input value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} placeholder="email@example.com" type="email" />
+									</div>
+									<p className="text-xs font-medium text-muted-foreground pt-1">Shipping Address</p>
+									<div className="grid grid-cols-2 gap-2">
+										<div className="space-y-1">
+											<Label className="text-xs">Governorate *</Label>
+											<Select value={guestGovernorate || "__none__"} onValueChange={(v) => {
+												const gov = v === "__none__" ? "" : v;
+												setGuestGovernorate(gov);
+												setGuestCity("");
+												setCityOptions(governorateCitiesMap[gov] ?? []);
+											}}>
+												<SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select governorate" /></SelectTrigger>
+												<SelectContent>
+													<SelectItem value="__none__">Select governorate</SelectItem>
+													{governorateOptions.map((g) => (
+														<SelectItem key={g} value={g}>{g}</SelectItem>
+													))}
+												</SelectContent>
+											</Select>
+										</div>
+										<div className="space-y-1">
+											<Label className="text-xs">City *</Label>
+											<Select value={guestCity || "__none__"} onValueChange={(v) => setGuestCity(v === "__none__" ? "" : v)} disabled={!guestGovernorate}>
+												<SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select city" /></SelectTrigger>
+												<SelectContent>
+													<SelectItem value="__none__">Select city</SelectItem>
+													{cityOptions.map((c) => (
+														<SelectItem key={c} value={c}>{c}</SelectItem>
+													))}
+												</SelectContent>
+											</Select>
+										</div>
+										<div className="space-y-1">
+											<Label className="text-xs">Block *</Label>
+											<Input value={guestBlock} onChange={(e) => setGuestBlock(e.target.value)} placeholder="1" />
+										</div>
+										<div className="space-y-1">
+											<Label className="text-xs">Street *</Label>
+											<Input value={guestStreet} onChange={(e) => setGuestStreet(e.target.value)} placeholder="Street name" />
+										</div>
+										<div className="space-y-1">
+											<Label className="text-xs">House *</Label>
+											<Input value={guestHouse} onChange={(e) => setGuestHouse(e.target.value)} placeholder="1" />
+										</div>
+										<div className="space-y-1">
+											<Label className="text-xs">Flat (optional)</Label>
+											<Input value={guestFlat} onChange={(e) => setGuestFlat(e.target.value)} placeholder="Flat no." />
+										</div>
+									</div>
+								</div>
+							)}
 						</div>
 					)}
 					{editingOrder && (

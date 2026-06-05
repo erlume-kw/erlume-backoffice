@@ -17,6 +17,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import ImageUploader from "@/components/common/ImageUploader";
 import type { Drop, Item } from "@/types/models";
 import { Zap, Calendar } from "lucide-react";
 import { restApi } from "@/lib/rest-client";
@@ -30,6 +31,7 @@ export default function DropsPage() {
 	const [editingDrop, setEditingDrop] = useState<Drop | null>(null);
 	const [formReleaseDate, setFormReleaseDate] = useState<Date | undefined>(undefined);
 	const [formError, setFormError] = useState<string | null>(null);
+	const [formBannerUrl, setFormBannerUrl] = useState<string[]>([]);
 
 	// Item multi-select state
 	const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
@@ -141,6 +143,7 @@ export default function DropsPage() {
 	const openEditForm = async (drop: Drop) => {
 		setEditingDrop(drop);
 		setFormReleaseDate(drop.releaseDate ? new Date(drop.releaseDate) : undefined);
+		setFormBannerUrl(drop.bannerImageUrl ? [drop.bannerImageUrl] : []);
 		setFormError(null);
 		setItemSearch("");
 		try {
@@ -158,6 +161,7 @@ export default function DropsPage() {
 	const openCreateForm = () => {
 		setEditingDrop(null);
 		setFormReleaseDate(undefined);
+		setFormBannerUrl([]);
 		setSelectedItemIds([]);
 		setOriginalDropItemIds([]);
 		setItemSearch("");
@@ -169,6 +173,7 @@ export default function DropsPage() {
 		setShowForm(false);
 		setEditingDrop(null);
 		setFormReleaseDate(undefined);
+		setFormBannerUrl([]);
 		setSelectedItemIds([]);
 		setOriginalDropItemIds([]);
 		setItemSearch("");
@@ -220,6 +225,7 @@ export default function DropsPage() {
 			description: String(formData.get("description") || ""),
 			releaseDate: formReleaseDate ? formReleaseDate.toISOString().slice(0, 10) : "",
 			status: String(formData.get("status") || "upcoming"),
+			bannerImageUrl: formBannerUrl[0] ?? undefined,
 		};
 
 		try {
@@ -370,6 +376,17 @@ export default function DropsPage() {
 							defaultValue={editingDrop?.description}
 							placeholder="Enter description"
 							rows={3}
+						/>
+					</div>
+					<div className="space-y-2">
+						<Label>Banner Image</Label>
+						<ImageUploader
+							folder="drops"
+							defaultUrls={formBannerUrl}
+							onChange={setFormBannerUrl}
+							multiple={false}
+							accept="image/jpeg,image/png,image/webp"
+							label="Upload banner"
 						/>
 					</div>
 					<div className="grid grid-cols-2 gap-4">

@@ -23,7 +23,7 @@ export default function OutfitsPage() {
 	const [bulkLoading, setBulkLoading] = useState(false);
 	const loadOutfits = useCallback(() => restApi.outfits.getAll(), []);
 	const loadItems = useCallback(
-		() => restApi.items.getAll() as Promise<Item[]>,
+		() => restApi.items.getAll({ limit: 500 }) as Promise<Item[]>,
 		[],
 	);
 	const {
@@ -159,6 +159,7 @@ export default function OutfitsPage() {
 			outfit_title,
 			outfit_tags,
 			item_ids,
+			coverImageUrl: formCoverUrl[0] ?? undefined,
 		};
 
 		try {
@@ -306,6 +307,17 @@ export default function OutfitsPage() {
 							name="outfit_tags"
 							defaultValue={editingOutfit?.outfit_tags?.join(" ")}
 							placeholder="casual, summer"
+						/>
+					</div>
+					<div className="space-y-2">
+						<Label>Cover Image</Label>
+						<ImageUploader
+							folder="outfits"
+							defaultUrls={formCoverUrl}
+							onChange={setFormCoverUrl}
+							multiple={false}
+							accept="image/jpeg,image/png,image/webp"
+							label="Upload cover"
 						/>
 					</div>
 					<div className="space-y-2">

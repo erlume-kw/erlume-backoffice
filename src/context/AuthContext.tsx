@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
-import { getToken, getUser, setAuth, clearAuth, type AuthUser } from "@/lib/auth";
+import { getToken, getRefreshToken, getUser, setAuth, clearAuth, type AuthUser } from "@/lib/auth";
 import { API_BASE_URL } from "@/lib/api-config";
 
 interface AuthContextValue {
@@ -23,14 +23,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 			body: JSON.stringify({ emailAddress, password }),
 		});
 		const data = await res.json();
-		if (!res.ok || !data.token) throw new Error(data.error || "Invalid credentials");
+
+		// Support both new (accessToken) and legacy (token) response shapes
+		const accessToken: string | undefined = data.accessToken ?? data.token;
+		if (!res.ok || !accessToken) throw new Error(data.error || "Invalid credentials");
 		if (!data.user?.roles?.includes("admin")) throw new Error("Access restricted to admins");
-		setAuth(data.token, data.user);
-		setToken(data.token);
+
+		setAuth(accessToken, data.user, data.refreshToken);
+		setToken(accessToken);
 		setUser(data.user);
 	}, []);
 
 	const logout = useCallback(() => {
+		const refreshToken = getRefreshToken();
+
+		// Revoke refresh token on backend (fire-and-forget)
+		if (refreshToken) {
+			void fetch(`${API_BASE_URL}/auth/logout`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ refreshToken }),
+			}).catch(() => {});
+		}
+
 		clearAuth();
 		setToken(null);
 		setUser(null);

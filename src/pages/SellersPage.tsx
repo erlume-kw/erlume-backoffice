@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/select";
 import type { Item, Seller, User } from "@/types/models";
 import { DatePicker, DateTimePicker } from "@/components/ui/date-picker";
-import { Store, DollarSign, QrCode, CalendarCheck2 } from "lucide-react";
+import { Store, QrCode, CalendarCheck2 } from "lucide-react";
 import { restApi } from "@/lib/rest-client";
 import { getEnumOptions, getEnumValues } from "@/lib/enums";
 import { useResourceList } from "@/hooks/use-resource-list";
@@ -55,6 +55,20 @@ export default function SellersPage() {
 	>(undefined);
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
 	const [showBulkUpdate, setShowBulkUpdate] = useState(false);
+	// Payout
+	const [showPayoutForm, setShowPayoutForm] = useState(false);
+	const [payoutAmount, setPayoutAmount] = useState("");
+	const [payoutMethod, setPayoutMethod] = useState("bank_transfer");
+	const [payoutNotes, setPayoutNotes] = useState("");
+	const [payoutError, setPayoutError] = useState<string | null>(null);
+	const [payoutLoading, setPayoutLoading] = useState(false);
+	const [payoutHistory, setPayoutHistory] = useState<any[]>([]);
+	const [payoutHistoryLoading, setPayoutHistoryLoading] = useState(false);
+	const [editingPayout, setEditingPayout] = useState<any | null>(null);
+	const [editPayoutAmount, setEditPayoutAmount] = useState("");
+	const [editPayoutMethod, setEditPayoutMethod] = useState("bank_transfer");
+	const [editPayoutNotes, setEditPayoutNotes] = useState("");
+	const [editPayoutLoading, setEditPayoutLoading] = useState(false);
 	const [bulkOnboardingStatus, setBulkOnboardingStatus] = useState("");
 	const [bulkItemsOnboardingStatus, setBulkItemsOnboardingStatus] =
 		useState("");
@@ -332,7 +346,7 @@ export default function SellersPage() {
 			header: "Balance",
 			render: (seller) => (
 				<span className="font-medium">
-					KD {Number(seller.balance || 0).toFixed(2)}
+					KWD {Number(seller.balance || 0).toFixed(3)}
 				</span>
 			),
 		},
@@ -420,6 +434,110 @@ export default function SellersPage() {
 		}
 	};
 
+	const loadPayoutHistory = async (sellerId: string) => {
+		setPayoutHistoryLoading(true);
+		try {
+			const res = await fetch(`/api/payouts?seller_id=${sellerId}`, {
+				headers: { Authorization: `Bearer ${localStorage.getItem("erlume_token")}` },
+			});
+			const data = await res.json();
+			setPayoutHistory(data.data ?? []);
+		} catch {
+			setPayoutHistory([]);
+		} finally {
+			setPayoutHistoryLoading(false);
+		}
+	};
+
+	const handlePayout = async () => {
+		if (!selectedSeller) return;
+		setPayoutError(null);
+		setPayoutLoading(true);
+		try {
+			const res = await fetch("/api/payouts", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${localStorage.getItem("erlume_token")}`,
+				},
+				body: JSON.stringify({
+					seller_id: selectedSeller._id,
+					amount: payoutAmount,
+					method: payoutMethod,
+					notes: payoutNotes || undefined,
+				}),
+			});
+			const data = await res.json();
+			if (!res.ok) throw new Error(data.error || "Payout failed");
+			setShowPayoutForm(false);
+			setPayoutAmount("");
+			setPayoutNotes("");
+			setPayoutMethod("bank_transfer");
+			// Reload sellers then update selectedSeller from fresh data
+			await reload();
+			setSelectedSeller((prev) =>
+				prev ? { ...prev, balance: data.newBalance ?? "0.000" } : prev,
+			);
+			void loadPayoutHistory(selectedSeller._id);
+		} catch (err: any) {
+			setPayoutError(err.message || "Failed to record payout");
+		} finally {
+			setPayoutLoading(false);
+		}
+	};
+
+	const handleEditPayout = async () => {
+		if (!editingPayout || !selectedSeller) return;
+		setEditPayoutLoading(true);
+		try {
+			const res = await fetch(`/api/payouts/${editingPayout._id}`, {
+				method: "PATCH",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${localStorage.getItem("erlume_token")}`,
+				},
+				body: JSON.stringify({
+					amount: editPayoutAmount,
+					method: editPayoutMethod,
+					notes: editPayoutNotes || undefined,
+				}),
+			});
+			const data = await res.json();
+			if (!res.ok) throw new Error(data.error || "Update failed");
+			if (data.newBalance !== undefined) {
+				setSelectedSeller((prev) => prev ? { ...prev, balance: data.newBalance } : prev);
+			}
+			setEditingPayout(null);
+			void loadPayoutHistory(selectedSeller._id);
+			await reload();
+		} catch (err: any) {
+			alert(err.message);
+		} finally {
+			setEditPayoutLoading(false);
+		}
+	};
+
+	const handleDeletePayout = async (payoutId: string) => {
+		if (!selectedSeller) return;
+		if (!window.confirm("Delete this payout? The balance will be restored.")) return;
+		try {
+			const res = await fetch(`/api/payouts/${payoutId}`, {
+				method: "DELETE",
+				headers: { Authorization: `Bearer ${localStorage.getItem("erlume_token")}` },
+			});
+			const data = await res.json();
+			if (!res.ok) throw new Error(data.error || "Delete failed");
+			// Restore balance in UI
+			const restored = (parseFloat(String(selectedSeller.balance)) || 0) +
+				parseFloat(String(payoutHistory.find((p) => p._id === payoutId)?.amount || 0));
+			setSelectedSeller((prev) => prev ? { ...prev, balance: restored.toFixed(3) } : prev);
+			void loadPayoutHistory(selectedSeller._id);
+			await reload();
+		} catch (err: any) {
+			alert(err.message);
+		}
+	};
+
 	const handleDelete = async (seller: Seller) => {
 		try {
 			setFormError(null);
@@ -455,7 +573,7 @@ export default function SellersPage() {
 			qrCode: String(formData.get("qrCode") || ""),
 			isDeactivated: formData.get("isDeactivated") === "on",
 			consentGiven: formData.get("consentGiven") === "on",
-			preferredPickupDate: formPreferredPickupDate
+			preferredPickupDate: formPreferredPickupDate && !isNaN(formPreferredPickupDate.getTime())
 				? formPreferredPickupDate.toISOString().slice(0, 10)
 				: "",
 			escalationStatus:
@@ -501,7 +619,7 @@ export default function SellersPage() {
 		};
 		const createSellerPayload = {
 			consentGiven: formData.get("consentGiven") === "on",
-			preferredPickupDate: formPreferredPickupDate
+			preferredPickupDate: formPreferredPickupDate && !isNaN(formPreferredPickupDate.getTime())
 				? formPreferredPickupDate.toISOString().slice(0, 10)
 				: "",
 			onboardingStatus:
@@ -825,7 +943,14 @@ export default function SellersPage() {
 					data={filteredSellers}
 					columns={columns}
 					keyExtractor={(seller) => seller._id}
-					onView={(seller) => setSelectedSeller(seller)}
+					onView={(seller) => {
+						setSelectedSeller(seller);
+						setShowPayoutForm(false);
+						setPayoutAmount("");
+						setPayoutNotes("");
+						setPayoutError(null);
+						void loadPayoutHistory(seller._id);
+					}}
 					onEdit={(seller) => {
 						setEditingSeller(seller);
 						setFormStep(1);
@@ -887,14 +1012,76 @@ export default function SellersPage() {
 							</div>
 						</div>
 						<div className="grid grid-cols-2 gap-4">
-							<div className="p-3 bg-muted/30 rounded-lg">
-								<div className="flex items-center gap-2 mb-1">
-									<DollarSign className="h-4 w-4 text-primary" />
-									<span className="text-sm text-muted-foreground">Balance</span>
+							<div className="p-3 bg-muted/30 rounded-lg col-span-2">
+								<div className="flex items-center justify-between mb-2">
+									<div className="flex items-center gap-2">
+										<span className="text-xs font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">KWD</span>
+										<span className="text-sm text-muted-foreground">Balance Owed</span>
+									</div>
+									{Number(selectedSeller.balance || 0) > 0 && (
+										<Button size="sm" variant="outline" className="h-7 text-xs"
+											onClick={() => setShowPayoutForm((v) => !v)}>
+											{showPayoutForm ? "Cancel" : "Mark as Paid"}
+										</Button>
+									)}
 								</div>
-								<p className="text-lg font-semibold">
-									KD {Number(selectedSeller.balance || 0).toFixed(2)}
+								<p className="text-2xl font-semibold text-primary">
+									KWD {Number(selectedSeller.balance || 0).toFixed(3)}
 								</p>
+
+								{/* Payout form */}
+								{showPayoutForm && (
+									<div className="mt-3 space-y-2 border-t border-border pt-3">
+										{payoutError && (
+											<p className="text-xs text-destructive">{payoutError}</p>
+										)}
+										<div className="grid grid-cols-2 gap-2">
+											<div className="space-y-1">
+												<div className="flex items-center justify-between">
+													<Label className="text-xs">Amount (KWD) *</Label>
+													<button type="button" className="text-xs text-primary underline leading-none"
+														onClick={() => setPayoutAmount(Number(selectedSeller.balance || 0).toFixed(3))}>
+														Pay all
+													</button>
+												</div>
+												<Input
+													type="number" step="0.001" min="0.001"
+													value={payoutAmount}
+													onChange={(e) => setPayoutAmount(e.target.value)}
+													placeholder={`Max ${Number(selectedSeller.balance || 0).toFixed(3)}`}
+												/>
+											</div>
+											<div className="space-y-1">
+												<Label className="text-xs">Method</Label>
+												<Select value={payoutMethod} onValueChange={setPayoutMethod}>
+													<SelectTrigger className="h-9">
+														<SelectValue />
+													</SelectTrigger>
+													<SelectContent>
+														<SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+														<SelectItem value="cash">Cash</SelectItem>
+														<SelectItem value="knet">KNET</SelectItem>
+														<SelectItem value="other">Other</SelectItem>
+													</SelectContent>
+												</Select>
+											</div>
+										</div>
+										<div className="space-y-1">
+											<Label className="text-xs">Notes (optional)</Label>
+											<Input
+												value={payoutNotes}
+												onChange={(e) => setPayoutNotes(e.target.value)}
+												placeholder="e.g. Transferred to IBAN KW..."
+											/>
+										</div>
+										<Button
+											size="sm" className="w-full"
+											disabled={payoutLoading || !payoutAmount}
+											onClick={() => void handlePayout()}>
+											{payoutLoading ? "Recording..." : "Confirm Payout"}
+										</Button>
+									</div>
+								)}
 							</div>
 							<div className="p-3 bg-muted/30 rounded-lg">
 								<div className="flex items-center gap-2 mb-1">
@@ -918,9 +1105,88 @@ export default function SellersPage() {
 								<div className="flex items-center gap-2 mb-1">
 									<span className="text-sm text-muted-foreground">IBAN</span>
 								</div>
-								<p className="text-sm text-muted-foreground">
+								<p className="text-sm font-mono">
 									{selectedSeller.IBAN || "—"}
 								</p>
+							</div>
+
+							{/* Payout history */}
+							<div className="col-span-2 space-y-2">
+								<p className="text-sm font-medium">Payout History</p>
+								{payoutHistoryLoading ? (
+									<p className="text-xs text-muted-foreground">Loading...</p>
+								) : payoutHistory.length === 0 ? (
+									<p className="text-xs text-muted-foreground">No payouts recorded yet.</p>
+								) : (
+									<div className="space-y-2">
+										{payoutHistory.map((p: any) => (
+											<div key={p._id} className="rounded-md border border-border px-3 py-2 text-sm space-y-2">
+												{editingPayout?._id === p._id ? (
+													<div className="space-y-2">
+														<div className="grid grid-cols-2 gap-2">
+															<div className="space-y-1">
+																<Label className="text-xs">Amount</Label>
+																<Input type="number" step="0.001" min="0.001"
+																	value={editPayoutAmount}
+																	onChange={(e) => setEditPayoutAmount(e.target.value)} />
+															</div>
+															<div className="space-y-1">
+																<Label className="text-xs">Method</Label>
+																<Select value={editPayoutMethod} onValueChange={setEditPayoutMethod}>
+																	<SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+																	<SelectContent>
+																		<SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+																		<SelectItem value="cash">Cash</SelectItem>
+																		<SelectItem value="knet">KNET</SelectItem>
+																		<SelectItem value="other">Other</SelectItem>
+																	</SelectContent>
+																</Select>
+															</div>
+														</div>
+														<Input placeholder="Notes (optional)"
+															value={editPayoutNotes}
+															onChange={(e) => setEditPayoutNotes(e.target.value)} />
+														<div className="flex gap-2">
+															<Button size="sm" className="flex-1" disabled={editPayoutLoading}
+																onClick={() => void handleEditPayout()}>
+																{editPayoutLoading ? "Saving..." : "Save"}
+															</Button>
+															<Button size="sm" variant="outline" className="flex-1"
+																onClick={() => setEditingPayout(null)}>
+																Cancel
+															</Button>
+														</div>
+													</div>
+												) : (
+													<div className="flex items-center justify-between">
+														<div>
+															<p className="font-medium">KWD {Number(p.amount).toFixed(3)}</p>
+															<p className="text-xs text-muted-foreground capitalize">
+																{p.method?.replace("_", " ")} · {new Date(p.paid_at).toLocaleDateString()}
+															</p>
+															{p.notes && <p className="text-xs text-muted-foreground">{p.notes}</p>}
+														</div>
+														<div className="flex gap-1">
+															<Button size="sm" variant="ghost" className="h-7 text-xs"
+																onClick={() => {
+																	setEditingPayout(p);
+																	setEditPayoutAmount(p.amount);
+																	setEditPayoutMethod(p.method || "bank_transfer");
+																	setEditPayoutNotes(p.notes || "");
+																}}>
+																Edit
+															</Button>
+															<Button size="sm" variant="ghost" className="h-7 text-xs text-destructive hover:text-destructive"
+																onClick={() => void handleDeletePayout(p._id)}>
+																Delete
+															</Button>
+														</div>
+													</div>
+												)}
+											</div>
+										))}
+									</div>
+								)}
 							</div>
 							<div className="p-3 bg-muted/30 rounded-lg">
 								<div className="flex items-center gap-2 mb-1">
@@ -1158,6 +1424,8 @@ export default function SellersPage() {
 											id="balance"
 											name="balance"
 											type="number"
+											step="0.001"
+											inputMode="decimal"
 											defaultValue={editingSeller?.balance || 0}
 											min={0}
 										/>

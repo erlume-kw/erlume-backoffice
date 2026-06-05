@@ -1,6 +1,6 @@
 import { endpoints } from "./api-config";
 import { API_BASE_URL } from "./api-config";
-import { getToken } from "./auth";
+import { getToken, getRefreshToken, setAuth, clearAuth, getUser } from "./auth";
 import type {
 	CreditCard,
 	DiscountCode,
@@ -35,6 +35,45 @@ function buildQuery(
 	return q ? `?${q}` : "";
 }
 
+// ─── Token refresh ────────────────────────────────────────────────────────────
+
+let isRefreshing = false;
+let refreshQueue: Array<(token: string | null) => void> = [];
+
+async function attemptTokenRefresh(): Promise<string | null> {
+	const refreshToken = getRefreshToken();
+	if (!refreshToken) return null;
+
+	try {
+		const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ refreshToken }),
+		});
+
+		if (!res.ok) {
+			clearAuth();
+			window.location.href = "/login";
+			return null;
+		}
+
+		const data = await res.json();
+		const user = getUser();
+		if (data.accessToken && user) {
+			setAuth(data.accessToken, user, data.refreshToken);
+			return data.accessToken;
+		}
+
+		clearAuth();
+		window.location.href = "/login";
+		return null;
+	} catch {
+		clearAuth();
+		window.location.href = "/login";
+		return null;
+	}
+}
+
 // Generic REST API helper
 async function apiRequest<T>(
 	endpoint: string,
@@ -49,6 +88,43 @@ async function apiRequest<T>(
 		},
 		...options,
 	});
+
+	// ── Auto-refresh on 401 ───────────────────────────────────────────────────
+	if (response.status === 401 && getRefreshToken()) {
+		let newToken: string | null;
+
+		if (isRefreshing) {
+			// Queue requests while a refresh is already in-flight
+			newToken = await new Promise<string | null>((resolve) => {
+				refreshQueue.push(resolve);
+			});
+		} else {
+			isRefreshing = true;
+			newToken = await attemptTokenRefresh();
+			refreshQueue.forEach((resolve) => resolve(newToken));
+			refreshQueue = [];
+			isRefreshing = false;
+		}
+
+		if (newToken) {
+			// Retry the original request with the new token
+			const retryResponse = await fetch(endpoint, {
+				...options,
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${newToken}`,
+					...options.headers,
+				},
+			});
+			if (retryResponse.ok) {
+				const retryText = await retryResponse.text();
+				if (!retryText.trim()) return undefined as T;
+				const parsed = JSON.parse(retryText);
+				if (parsed?.success === true && "data" in parsed) return parsed.data as T;
+				return parsed as T;
+			}
+		}
+	}
 
 	if (!response.ok) {
 		// Try to parse error response with new validation format
@@ -466,7 +542,7 @@ export default restApi;
 
 // ─── File upload ──────────────────────────────────────────────────────────────
 
-export type UploadFolder = "items" | "receipts" | "price-estimators" | "quotes";
+export type UploadFolder = "items" | "receipts" | "price-estimators" | "quotes" | "drops" | "outfits";
 
 export async function uploadFile(
 	file: File,

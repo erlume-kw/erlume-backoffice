@@ -111,6 +111,7 @@ export interface Drop {
 	description?: string;
 	releaseDate: string;
 	status: string;
+	bannerImageUrl?: string;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -145,7 +146,20 @@ export interface Review {
 
 export interface Order {
 	_id: string;
-	user_id: string;
+	user_id?: string;
+	guestInfo?: {
+		name: string;
+		phoneNumber: string;
+		emailAddress?: string;
+		shippingAddress: {
+			street: string;
+			city: string;
+			block: string;
+			governorate: string;
+			house: string;
+			flat?: string;
+		};
+	};
 	orderitem_ids: string[];
 	order_status: string;
 	deliveryDate?: string;
@@ -262,6 +276,7 @@ export interface Outfit {
 	item_ids: string[];
 	outfit_title: string;
 	outfit_tags: string;
+	coverImageUrl?: string;
 	createdAt: string;
 	updatedAt: string;
 }
