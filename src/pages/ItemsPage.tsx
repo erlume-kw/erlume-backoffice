@@ -61,6 +61,7 @@ export default function ItemsPage() {
 	const [brandSearch, setBrandSearch] = useState("");
 	const [formError, setFormError] = useState<string | null>(null);
 	const [formImageUrls, setFormImageUrls] = useState<string[]>([]);
+	const [formMainImageUrl, setFormMainImageUrl] = useState<string>("");
 	const [formReceiptUrls, setFormReceiptUrls] = useState<string[]>([]);
 	const [formPriceEstimatorUrls, setFormPriceEstimatorUrls] = useState<string[]>([]);
 	const [formQuoteUrls, setFormQuoteUrls] = useState<string[]>([]);
@@ -478,6 +479,7 @@ export default function ItemsPage() {
 			drop_id: formDropId || undefined,
 			seller_id: formSellerId || undefined,
 			imageUrls,
+			mainImageUrl: formMainImageUrl || undefined,
 			receiptPhotoUrls: receiptPhotoUrls.length ? receiptPhotoUrls : undefined,
 			priceEstimatorUrls: priceEstimatorUrls.length
 				? priceEstimatorUrls
@@ -579,6 +581,7 @@ export default function ItemsPage() {
 					setFormBrand("");
 					setBrandSearch("");
 					setFormImageUrls([]);
+					setFormMainImageUrl("");
 					setFormReceiptUrls([]);
 					setFormPriceEstimatorUrls([]);
 					setFormQuoteUrls([]);
@@ -753,6 +756,7 @@ export default function ItemsPage() {
 						setFormCategoryId(item.category_id);
 						setFormSubCategoryId(item.sub_category_id ?? undefined);
 						setFormImageUrls(item.imageUrls ?? []);
+						setFormMainImageUrl(item.mainImageUrl ?? "");
 						setFormReceiptUrls(item.receiptPhotoUrls ?? []);
 						setFormPriceEstimatorUrls(item.priceEstimatorUrls ?? []);
 						setFormQuoteUrls(item.quoteUrls ?? []);
@@ -773,9 +777,9 @@ export default function ItemsPage() {
 				{selectedItem && (
 					<div className="space-y-6">
 						<div className="aspect-video bg-muted rounded-lg flex items-center justify-center overflow-hidden">
-							{selectedItem.imageUrls?.length ? (
+							{(selectedItem.mainImageUrl ?? selectedItem.imageUrls?.[0]) ? (
 								<img
-									src={selectedItem.imageUrls[0]}
+									src={selectedItem.mainImageUrl ?? selectedItem.imageUrls[0]}
 									alt={selectedItem.itemName}
 									className="w-full h-full object-contain"
 								/>
@@ -1490,11 +1494,39 @@ export default function ItemsPage() {
 											<ImageUploader
 												folder="items"
 												defaultUrls={formImageUrls}
-												onChange={setFormImageUrls}
+												onChange={(urls) => {
+													setFormImageUrls(urls);
+													if (formMainImageUrl && !urls.includes(formMainImageUrl)) {
+														setFormMainImageUrl(urls[0] ?? "");
+													}
+												}}
 												multiple={true}
 												accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif"
 												label="Upload images"
 											/>
+											{formImageUrls.length > 1 && (
+												<div className="space-y-1.5">
+													<p className="text-xs text-muted-foreground">Tap an image to set it as the cover photo</p>
+													<div className="flex flex-wrap gap-2">
+														{formImageUrls.map((url) => {
+															const isMain = (formMainImageUrl || formImageUrls[0]) === url;
+															return (
+																<button
+																	key={url}
+																	type="button"
+																	onClick={() => setFormMainImageUrl(url)}
+																	className={`relative w-16 h-16 rounded-md overflow-hidden border-2 transition-all ${isMain ? "border-primary ring-2 ring-primary/30" : "border-border opacity-60 hover:opacity-100"}`}
+																>
+																	<img src={url} className="w-full h-full object-cover" />
+																	{isMain && (
+																		<span className="absolute bottom-0 left-0 right-0 bg-primary text-primary-foreground text-[9px] text-center py-0.5">COVER</span>
+																	)}
+																</button>
+															);
+														})}
+													</div>
+												</div>
+											)}
 										</div>
 										<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 											<div className="space-y-2 min-w-0">

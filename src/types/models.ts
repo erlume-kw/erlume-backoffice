@@ -84,6 +84,7 @@ export interface Item {
 	quantity: string;
 	brandName: string;
 	imageUrls: string[];
+	mainImageUrl?: string;
 	receiptPhotoUrls?: string[];
 	priceEstimatorUrls?: string[];
 	quoteUrls?: string[];
