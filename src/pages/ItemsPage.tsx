@@ -247,6 +247,7 @@ export default function ItemsPage() {
 					<div>
 						<p className="font-medium text-foreground">{item.itemName}</p>
 						<p className="text-sm text-muted-foreground">{item.brandName}</p>
+						<p className="text-xs text-muted-foreground/50 font-mono">…{item._id.slice(-8)}</p>
 					</div>
 				</div>
 			),
@@ -795,6 +796,15 @@ export default function ItemsPage() {
 								<p className="text-muted-foreground">
 									{selectedItem.brandName}
 								</p>
+								<button
+									type="button"
+									className="flex items-center gap-1.5 mt-1 text-xs font-mono text-muted-foreground/60 hover:text-foreground transition-colors group"
+									onClick={() => void navigator.clipboard.writeText(selectedItem._id)}
+									title="Click to copy ID"
+								>
+									<span>{selectedItem._id}</span>
+									<span className="opacity-0 group-hover:opacity-100 text-[10px]">copy</span>
+								</button>
 							</div>
 							<StatusBadge status={selectedItem.itemStatus} />
 						</div>
