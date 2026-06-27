@@ -21,6 +21,7 @@ import type {
 	Item,
 	Order,
 	OrderItem,
+	ShippingMethod,
 	User,
 } from "@/types/models";
 import { DateTimePicker } from "@/components/ui/date-picker";
@@ -63,9 +64,8 @@ export default function OrdersPage() {
 	const [cityOptions, setCityOptions] = useState<string[]>([]);
 	const [governorateCitiesMap, setGovernorateCitiesMap] = useState<Record<string, string[]>>({});
 	const [formDiscountId, setFormDiscountId] = useState("");
-	const [formDeliveryDate, setFormDeliveryDate] = useState<Date | undefined>(
-		undefined,
-	);
+	const [formDeliveryDate, setFormDeliveryDate] = useState<Date | undefined>(undefined);
+	const [formShippingMethodId, setFormShippingMethodId] = useState<string>("");
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
 	const [showBulkUpdate, setShowBulkUpdate] = useState(false);
 	const [bulkOrderStatus, setBulkOrderStatus] = useState("");
@@ -111,6 +111,10 @@ export default function OrdersPage() {
 		() => restApi.discountcodes.getAll() as Promise<DiscountCode[]>,
 		[],
 	);
+	const loadShippingMethods = useCallback(
+		() => restApi.shipping.getAll() as Promise<ShippingMethod[]>,
+		[],
+	);
 	const {
 		data: orders,
 		loading,
@@ -120,8 +124,8 @@ export default function OrdersPage() {
 	const { data: orderStatus } = useResourceList(loadOrderStatus);
 	const { data: users } = useResourceList<User>(loadUsers);
 	const { data: items } = useResourceList<Item>(loadItems);
-	const { data: discountCodes } =
-		useResourceList<DiscountCode>(loadDiscountCodes);
+	const { data: discountCodes } = useResourceList<DiscountCode>(loadDiscountCodes);
+	const { data: shippingMethods } = useResourceList<ShippingMethod>(loadShippingMethods);
 	useEffect(() => { void loadKuwaitEnums(); }, [loadKuwaitEnums]);
 	const userLabelById = useMemo(
 		() =>
@@ -486,6 +490,7 @@ export default function OrdersPage() {
 		setFormDeliveryDate(
 			order.deliveryDate ? new Date(order.deliveryDate) : undefined,
 		);
+		setFormShippingMethodId((order as any).shippingMethod_id ?? "");
 		setOrderItemSelections({});
 		setItemSearch("");
 		setFormUserId(getUserIdValue(order.user_id));
@@ -550,12 +555,11 @@ export default function OrdersPage() {
 					formData.get("trackingReference") ?? "",
 				).trim();
 				const updatedOrder = await restApi.ordersExtra.patch(editingOrder._id, {
-					order_status, // Already normalized to lowercase by orderStatusForApi
-					...(formDeliveryDate && {
-						deliveryDate: formDeliveryDate.toISOString(),
-					}),
-					...(deliveryStatus && { deliveryStatus }), // Already normalized to lowercase
+					order_status,
+					...(formDeliveryDate && { deliveryDate: formDeliveryDate.toISOString() }),
+					...(deliveryStatus && { deliveryStatus }),
 					...(trackingReference && { trackingReference }),
+					...(formShippingMethodId && { shippingMethod_id: formShippingMethodId }),
 				});
 				setSelectedOrder((current) =>
 					current && current._id === editingOrder._id
@@ -571,6 +575,7 @@ export default function OrdersPage() {
 				const orderPayload: Record<string, unknown> = {
 					order_status,
 					orderItems: selectedItems,
+					...(formShippingMethodId && { shippingMethod_id: formShippingMethodId }),
 				};
 				if (orderType === "guest") {
 					orderPayload.guestInfo = {
@@ -650,6 +655,7 @@ export default function OrdersPage() {
 			setShowForm(false);
 			setEditingOrder(null);
 			setFormDeliveryDate(undefined);
+			setFormShippingMethodId("");
 			setExistingOrderItems([]);
 			setOrderItemsInitialized(false);
 			setFormDiscountId("");
@@ -1316,6 +1322,24 @@ export default function OrdersPage() {
 							</SelectContent>
 						</Select>
 					</div>
+					<div className="space-y-2">
+						<Label>Shipping method</Label>
+						<Select
+							value={formShippingMethodId || "__none__"}
+							onValueChange={(v) => setFormShippingMethodId(v === "__none__" ? "" : v)}>
+							<SelectTrigger>
+								<SelectValue placeholder="Select shipping method" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="__none__">— None —</SelectItem>
+								{shippingMethods.filter((m) => m.isActive).map((m) => (
+									<SelectItem key={m._id} value={m._id}>
+										{m.name}{m.price === 0 ? " (Free)" : ` — KWD ${m.price.toFixed(3)}`}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+					</div>
 					{editingOrder && (
 						<>
 							<div className="space-y-2">
@@ -1373,6 +1397,7 @@ export default function OrdersPage() {
 								setShowForm(false);
 								setEditingOrder(null);
 								setFormDeliveryDate(undefined);
+								setFormShippingMethodId("");
 								setFormDiscountId("");
 							}}>
 							Cancel
