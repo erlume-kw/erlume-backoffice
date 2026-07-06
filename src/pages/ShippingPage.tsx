@@ -27,6 +27,7 @@ export default function ShippingPage() {
 	const [showForm, setShowForm] = useState(false);
 	const [editing, setEditing] = useState<ShippingMethod | null>(null);
 	const [formIsActive, setFormIsActive] = useState(true);
+	const [formType, setFormType] = useState<"delivery" | "pickup">("delivery");
 	const [formZones, setFormZones] = useState<string[]>([]);
 
 	const loadMethods = useCallback(() => restApi.shipping.getAll(), []);
