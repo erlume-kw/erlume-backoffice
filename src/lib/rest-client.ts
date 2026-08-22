@@ -535,6 +535,15 @@ export const restApi = {
 			apiRequest<NewsletterSubscriber[]>(
 				`${endpoints.newsletter}${includeInactive ? "?includeInactive=true" : ""}`,
 			),
+		/**
+		 * DELETE /api/newsletter/admin/:id — admin delete. Stronger than a
+		 * self-service unsubscribe: also clears the subscriber's verified-email
+		 * record, so resubscribing later requires a fresh OTP.
+		 */
+		delete: (id: string) =>
+			apiRequest<void>(`${endpoints.newsletter}/admin/${id}`, {
+				method: "DELETE",
+			}),
 	},
 };
 

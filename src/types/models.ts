@@ -345,6 +345,8 @@ export interface NewsletterSubscriber {
 	email: string;
 	subscribedAt: string;
 	isActive: boolean;
+	isDeleted: boolean;
+	deletedAt: string | null;
 	createdAt: string;
 	updatedAt: string;
 }

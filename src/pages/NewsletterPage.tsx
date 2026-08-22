@@ -20,6 +20,15 @@ export default function NewsletterPage() {
 	);
 	const { data: subscribers, loading, error, reload } = useResourceList(loadSubscribers);
 
+	const handleDelete = async (id: string) => {
+		try {
+			await restApi.newsletter.delete(id);
+			await reload();
+		} catch (err) {
+			console.error("Failed to delete subscriber", err);
+		}
+	};
+
 	const filtered = useMemo(() => {
 		const list = Array.isArray(subscribers) ? subscribers : [];
 		return list.filter(
@@ -76,9 +85,13 @@ export default function NewsletterPage() {
 			render: (s) => (
 				<span
 					className={`text-sm font-medium ${
-						s.isActive ? "text-success" : "text-muted-foreground"
+						s.isDeleted
+							? "text-destructive"
+							: s.isActive
+								? "text-success"
+								: "text-muted-foreground"
 					}`}>
-					{s.isActive ? "Subscribed" : "Unsubscribed"}
+					{s.isDeleted ? "Deleted" : s.isActive ? "Subscribed" : "Unsubscribed"}
 				</span>
 			),
 		},
@@ -132,6 +145,9 @@ export default function NewsletterPage() {
 					data={filtered}
 					columns={columns}
 					keyExtractor={(s) => s._id}
+					onDelete={(s) => {
+						void handleDelete(s._id);
+					}}
 				/>
 			</div>
 		</AdminLayout>
