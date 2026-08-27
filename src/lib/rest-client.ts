@@ -451,6 +451,17 @@ export const restApi = {
 				method: "PATCH",
 				body: JSON.stringify({ isDeleted: true }),
 			}),
+		/**
+		 * DELETE /api/users/{id}/hard — permanently remove the user (and its
+		 * seller record + refresh tokens). Unlike softDelete this cannot be
+		 * undone. The subscriber's newsletter row is left intact; the shared
+		 * verified-email record is cleared only when the address is gone from
+		 * both users and newsletter.
+		 */
+		hardDelete: (id: string) =>
+			apiRequest<unknown>(`${endpoints.users}/${id}/hard`, {
+				method: "DELETE",
+			}),
 	},
 	ordersExtra: {
 		/** PATCH /api/orders/{id}/status — body uses order_status to align with OpenAPI. */

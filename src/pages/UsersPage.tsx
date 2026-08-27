@@ -343,6 +343,23 @@ export default function UsersPage() {
 		}
 	};
 
+	// Permanent, irreversible removal — distinct from the soft delete above.
+	// Used to fully wipe a test account so the email/OTP/welcome flow can be
+	// re-run from scratch. The newsletter row for the same email is kept.
+	const handleHardDelete = async (id: string) => {
+		try {
+			setFormError(null);
+			await restApi.usersExtra.hardDelete(id);
+			setSelectedUser(null);
+			await reload();
+		} catch (err) {
+			const message =
+				err instanceof Error ? err.message : "Failed to permanently delete user";
+			setFormError(message);
+			console.error("Failed to hard delete user", err);
+		}
+	};
+
 	const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		const formData = new FormData(event.currentTarget);
@@ -634,7 +651,7 @@ export default function UsersPage() {
 								</span>
 							</div>
 						</div>
-						<div className="pt-4 border-t border-border">
+						<div className="pt-4 border-t border-border space-y-3">
 							<Button
 								variant="outline"
 								className="w-full"
@@ -645,6 +662,24 @@ export default function UsersPage() {
 								}}>
 								Edit User
 							</Button>
+							<Button
+								variant="destructive"
+								className="w-full"
+								onClick={() => {
+									if (
+										window.confirm(
+											`Permanently delete ${selectedUser.emailAddress}?\n\nThis removes the account, its seller record and active sessions, and cannot be undone. Their newsletter subscription (if any) is kept.`,
+										)
+									) {
+										void handleHardDelete(selectedUser._id);
+									}
+								}}>
+								Permanently Delete
+							</Button>
+							<p className="text-xs text-muted-foreground">
+								Soft-deactivate instead from the row menu — permanent delete is
+								for fully resetting a test account.
+							</p>
 						</div>
 					</div>
 				)}
