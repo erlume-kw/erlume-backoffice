@@ -24,6 +24,7 @@ type StatusType =
   | 'scheduled'
   | 'upcoming'
   | 'ended'
+  | 'hidden'
   | 'returned'
   | 'partially_refunded'
   | 'new'
@@ -78,6 +79,7 @@ const statusStyles: Record<string, string> = {
   archived: 'status-inactive',
   closed: 'status-inactive',
   ended: 'status-inactive',
+  hidden: 'status-inactive',
   out_of_stock: 'status-inactive',
   sold: 'status-inactive',
   

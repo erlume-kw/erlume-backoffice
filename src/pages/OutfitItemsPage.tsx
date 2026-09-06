@@ -49,8 +49,9 @@ export default function OutfitItemsPage() {
 		error,
 		reload,
 	} = useResourceList(loadOutfitItems);
-	const { data: items } = useResourceList(loadItems);
-	const { data: outfits } = useResourceList(loadOutfits);
+	const { data: items, reload: reloadItems } = useResourceList(loadItems);
+	const { data: outfits, reload: reloadOutfits } = useResourceList(loadOutfits);
+	const handleRefresh = () => { void Promise.all([reload(), reloadItems(), reloadOutfits()]); };
 
 	const itemLabelById = useMemo(
 		() =>
@@ -229,6 +230,8 @@ export default function OutfitItemsPage() {
 				searchValue={search}
 				onSearchChange={setSearch}
 				searchPlaceholder="Search outfit items..."
+				onRefresh={handleRefresh}
+				refreshing={loading}
 				onAdd={() => {
 					setEditingOutfitItem(null);
 					setFormItemId("");

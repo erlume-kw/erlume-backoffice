@@ -19,6 +19,7 @@ import {
 	Briefcase,
 	Truck,
 	Mail,
+	History,
 	LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -45,6 +46,7 @@ const navigation = [
 	{ name: "Reviews", href: "/reviews", icon: Star },
 	{ name: "Shipping", href: "/shipping", icon: Truck },
 	{ name: "Newsletter", href: "/newsletter", icon: Mail },
+	{ name: "Logs", href: "/logs", icon: History },
 ];
 
 export function AdminSidebar() {

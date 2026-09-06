@@ -106,10 +106,13 @@ export default function SalesPage() {
 		error,
 		reload,
 	} = useResourceList(loadSales);
-	const { data: ordersData } = useResourceList(loadOrders);
-	const { data: orderItemsData } = useResourceList(loadOrderItems);
-	const { data: transactionsData } = useResourceList(loadTransactions);
-	const { data: itemsData } = useResourceList(loadItems);
+	const { data: ordersData, reload: reloadOrders } = useResourceList(loadOrders);
+	const { data: orderItemsData, reload: reloadOrderItems } = useResourceList(loadOrderItems);
+	const { data: transactionsData, reload: reloadTransactions } = useResourceList(loadTransactions);
+	const { data: itemsData, reload: reloadItems } = useResourceList(loadItems);
+	const handleRefresh = () => {
+		void Promise.all([reload(), reloadOrders(), reloadOrderItems(), reloadTransactions(), reloadItems()]);
+	};
 
 	const safeSales = Array.isArray(salesData) ? salesData : [];
 	const safeOrders = Array.isArray(ordersData) ? ordersData : [];
@@ -462,6 +465,8 @@ export default function SalesPage() {
 				searchValue={search}
 				onSearchChange={setSearch}
 				searchPlaceholder="Search sales..."
+				onRefresh={handleRefresh}
+				refreshing={loading}
 				onAdd={() => {
 					setEditingSale(null);
 					setFormFlow("order");

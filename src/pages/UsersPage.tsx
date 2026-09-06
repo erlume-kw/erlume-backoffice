@@ -468,6 +468,8 @@ export default function UsersPage() {
 				searchValue={search}
 				onSearchChange={setSearch}
 				searchPlaceholder="Search users..."
+				onRefresh={reload}
+				refreshing={loading}
 				onAdd={() => {
 					setEditingUser(null);
 					setFormRole("user");

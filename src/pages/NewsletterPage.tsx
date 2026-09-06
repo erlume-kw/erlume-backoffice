@@ -105,6 +105,8 @@ export default function NewsletterPage() {
 				searchValue={search}
 				onSearchChange={setSearch}
 				searchPlaceholder="Search emails..."
+				onRefresh={reload}
+				refreshing={loading}
 			/>
 
 			<div className="p-6">

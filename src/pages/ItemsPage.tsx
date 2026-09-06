@@ -108,18 +108,30 @@ export default function ItemsPage() {
 		[],
 	);
 	const { data: items, loading, error, reload } = useResourceList(loadItems);
-	const { data: drops } = useResourceList<Drop>(loadDrops);
-	const { data: categories } = useResourceList(loadCategories);
-	const { data: subcategories } = useResourceList(loadSubcategories);
-	const { data: sellers } = useResourceList(loadSellers);
-	const { data: users } = useResourceList(loadUsers);
+	const { data: drops, reload: reloadDrops } = useResourceList<Drop>(loadDrops);
+	const { data: categories, reload: reloadCategories } = useResourceList(loadCategories);
+	const { data: subcategories, reload: reloadSubcategories } = useResourceList(loadSubcategories);
+	const { data: sellers, reload: reloadSellers } = useResourceList(loadSellers);
+	const { data: users, reload: reloadUsers } = useResourceList(loadUsers);
 	const { data: itemStatus } = useResourceList(loadItemStatus);
 	const { data: itemCondition } = useResourceList(loadItemCondition);
 	const {
 		data: brandList,
 		error: brandError,
 		loading: brandLoading,
+		reload: reloadBrand,
 	} = useResourceList(loadBrand);
+	const handleRefresh = () => {
+		void Promise.all([
+			reload(),
+			reloadDrops(),
+			reloadCategories(),
+			reloadSubcategories(),
+			reloadSellers(),
+			reloadUsers(),
+			reloadBrand(),
+		]);
+	};
 	const userLabelById = useMemo(
 		() =>
 			new Map(
@@ -566,6 +578,8 @@ export default function ItemsPage() {
 				searchValue={search}
 				onSearchChange={setSearch}
 				searchPlaceholder="Search items..."
+				onRefresh={handleRefresh}
+				refreshing={loading}
 				onAdd={() => {
 					setEditingItem(null);
 					setFormAuthenticatedAt(undefined);

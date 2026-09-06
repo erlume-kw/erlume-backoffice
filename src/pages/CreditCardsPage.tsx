@@ -150,6 +150,8 @@ export default function CreditCardsPage() {
 				searchValue={search}
 				onSearchChange={setSearch}
 				searchPlaceholder="Search cards..."
+				onRefresh={reload}
+				refreshing={loading}
 				onAdd={() => {
 					setEditingCard(null);
 					setShowForm(true);

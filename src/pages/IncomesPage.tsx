@@ -107,10 +107,13 @@ export default function IncomesPage() {
 		error,
 		reload,
 	} = useResourceList(loadIncomes);
-	const { data: orders } = useResourceList(loadOrders);
-	const { data: items } = useResourceList(loadItems);
-	const { data: sellers } = useResourceList(loadSellers);
-	const { data: users } = useResourceList(loadUsers);
+	const { data: orders, reload: reloadOrders } = useResourceList(loadOrders);
+	const { data: items, reload: reloadItems } = useResourceList(loadItems);
+	const { data: sellers, reload: reloadSellers } = useResourceList(loadSellers);
+	const { data: users, reload: reloadUsers } = useResourceList(loadUsers);
+	const handleRefresh = () => {
+		void Promise.all([reload(), reloadOrders(), reloadItems(), reloadSellers(), reloadUsers()]);
+	};
 
 	const safeOrders = Array.isArray(orders) ? orders : [];
 	const safeItems = Array.isArray(items) ? items : [];
@@ -375,6 +378,8 @@ export default function IncomesPage() {
 				searchValue={search}
 				onSearchChange={setSearch}
 				searchPlaceholder="Search by order, item, seller, amount..."
+				onRefresh={handleRefresh}
+				refreshing={loading}
 				onAdd={() => {
 					setEditingIncome(null);
 					setFormOrderId("");

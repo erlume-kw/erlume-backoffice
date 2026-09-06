@@ -146,6 +146,8 @@ export default function DemandsPage() {
 				searchValue={search}
 				onSearchChange={setSearch}
 				searchPlaceholder="Search demands..."
+				onRefresh={reload}
+				refreshing={loading}
 				onAdd={() => {
 					setEditingDemand(null);
 					setShowForm(true);

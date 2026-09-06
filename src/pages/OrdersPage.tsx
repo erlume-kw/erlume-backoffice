@@ -122,11 +122,14 @@ export default function OrdersPage() {
 		reload,
 	} = useResourceList<Order>(loadOrders);
 	const { data: orderStatus } = useResourceList(loadOrderStatus);
-	const { data: users } = useResourceList<User>(loadUsers);
-	const { data: items } = useResourceList<Item>(loadItems);
-	const { data: discountCodes } = useResourceList<DiscountCode>(loadDiscountCodes);
-	const { data: shippingMethods } = useResourceList<ShippingMethod>(loadShippingMethods);
+	const { data: users, reload: reloadUsers } = useResourceList<User>(loadUsers);
+	const { data: items, reload: reloadItems } = useResourceList<Item>(loadItems);
+	const { data: discountCodes, reload: reloadDiscountCodes } = useResourceList<DiscountCode>(loadDiscountCodes);
+	const { data: shippingMethods, reload: reloadShippingMethods } = useResourceList<ShippingMethod>(loadShippingMethods);
 	useEffect(() => { void loadKuwaitEnums(); }, [loadKuwaitEnums]);
+	const handleRefresh = () => {
+		void Promise.all([reload(), reloadUsers(), reloadItems(), reloadDiscountCodes(), reloadShippingMethods()]);
+	};
 	const userLabelById = useMemo(
 		() =>
 			new Map(
@@ -675,6 +678,8 @@ export default function OrdersPage() {
 				searchValue={search}
 				onSearchChange={setSearch}
 				searchPlaceholder="Search orders..."
+				onRefresh={handleRefresh}
+				refreshing={loading}
 				onAdd={() => {
 					setEditingOrder(null);
 					setFormDeliveryDate(undefined);

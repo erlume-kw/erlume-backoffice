@@ -124,6 +124,7 @@ export default function SellersPage() {
 	const { data: governorates } = useResourceList(loadGovernorates);
 	const { data: cities } = useResourceList(loadCities);
 	const { data: items, reload: reloadItems } = useResourceList(loadItems);
+	const handleRefresh = () => { void Promise.all([reload(), reloadUsers(), reloadItems()]); };
 	const userLabelById = useMemo(
 		() =>
 			new Map(
@@ -806,6 +807,8 @@ export default function SellersPage() {
 				searchValue={search}
 				onSearchChange={setSearch}
 				searchPlaceholder="Search sellers..."
+				onRefresh={handleRefresh}
+				refreshing={loading}
 				onAdd={() => {
 					setEditingSeller(null);
 					setFormStep(1);

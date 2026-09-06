@@ -38,7 +38,8 @@ export default function CategoriesPage() {
 		error,
 		reload,
 	} = useResourceList(loadCategories);
-	const { data: subcategories } = useResourceList(loadSubCategories);
+	const { data: subcategories, reload: reloadSubcategories } = useResourceList(loadSubCategories);
+	const handleRefresh = () => { void Promise.all([reload(), reloadSubcategories()]); };
 
 	const subCategoryNameById = useMemo(
 		() => new Map(subcategories.map((sub) => [sub._id, sub.sub_cat_name])),
@@ -212,6 +213,8 @@ export default function CategoriesPage() {
 				searchValue={search}
 				onSearchChange={setSearch}
 				searchPlaceholder="Search categories..."
+				onRefresh={handleRefresh}
+				refreshing={loading}
 				onAdd={() => {
 					setEditingCategory(null);
 					setFormSubCategoryIds([]);

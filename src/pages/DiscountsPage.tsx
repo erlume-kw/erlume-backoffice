@@ -219,6 +219,8 @@ export default function DiscountsPage() {
 				searchValue={search}
 				onSearchChange={setSearch}
 				searchPlaceholder="Search codes..."
+				onRefresh={reload}
+				refreshing={loading}
 				onAdd={() => {
 					setEditingCode(null);
 					setFormIsActive(true);

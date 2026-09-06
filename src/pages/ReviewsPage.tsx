@@ -173,6 +173,8 @@ export default function ReviewsPage() {
 				searchValue={search}
 				onSearchChange={setSearch}
 				searchPlaceholder="Search reviews..."
+				onRefresh={reload}
+				refreshing={loading}
 			/>
 
 			<div className="p-6 space-y-4">

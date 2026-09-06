@@ -64,7 +64,8 @@ export default function EmployeesPage() {
 		error,
 		reload,
 	} = useResourceList(loadEmployees);
-	const { data: users } = useResourceList(loadUsers);
+	const { data: users, reload: reloadUsers } = useResourceList(loadUsers);
+	const handleRefresh = () => { void Promise.all([reload(), reloadUsers()]); };
 
 	const safeEmployees = Array.isArray(employees) ? employees : [];
 	const safeUsers = Array.isArray(users) ? users : [];
@@ -233,6 +234,8 @@ export default function EmployeesPage() {
 				searchValue={search}
 				onSearchChange={setSearch}
 				searchPlaceholder="Search employees..."
+				onRefresh={handleRefresh}
+				refreshing={loading}
 				onAdd={() => {
 					setEditingEmployee(null);
 					setFormUserId("");

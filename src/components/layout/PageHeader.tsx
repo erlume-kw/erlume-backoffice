@@ -1,7 +1,8 @@
 import { ReactNode } from 'react';
-import { Search, Plus } from 'lucide-react';
+import { Search, Plus, RefreshCw } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 interface PageHeaderProps {
   title: string;
@@ -12,6 +13,10 @@ interface PageHeaderProps {
   searchValue?: string;
   onSearchChange?: (value: string) => void;
   searchPlaceholder?: string;
+  /** Re-fetches the page's data without a full URL/browser refresh. Omit to hide the button. */
+  onRefresh?: () => void;
+  /** Spins the refresh icon while a reload is in flight. */
+  refreshing?: boolean;
 }
 
 export function PageHeader({
@@ -23,6 +28,8 @@ export function PageHeader({
   searchValue,
   onSearchChange,
   searchPlaceholder = 'Search...',
+  onRefresh,
+  refreshing = false,
 }: PageHeaderProps) {
   return (
     <div className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl border-b border-border">
@@ -47,6 +54,17 @@ export function PageHeader({
               </div>
             )}
             {children}
+            {onRefresh && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={onRefresh}
+                disabled={refreshing}
+                aria-label="Refresh"
+                title="Refresh">
+                <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
+              </Button>
+            )}
             {onAdd && (
               <Button onClick={onAdd} className="gap-2">
                 <Plus className="h-4 w-4" />

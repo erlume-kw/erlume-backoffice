@@ -33,6 +33,8 @@ interface DataTableProps<T> {
 	onView?: (item: T) => void;
 	onEdit?: (item: T) => void;
 	onDelete?: (item: T) => void;
+	/** Makes the whole row clickable (cursor + click), independent of the Actions menu. */
+	onRowClick?: (item: T) => void;
 	loading?: boolean;
 	page?: number;
 	totalPages?: number;
@@ -47,6 +49,7 @@ export function DataTable<T>({
 	onView,
 	onEdit,
 	onDelete,
+	onRowClick,
 	loading,
 	page = 1,
 	totalPages = 1,
@@ -114,14 +117,17 @@ export function DataTable<T>({
 							</tr>
 						) : (
 							data.map((item) => (
-								<tr key={keyExtractor(item)}>
+								<tr
+									key={keyExtractor(item)}
+									onClick={onRowClick ? () => onRowClick(item) : undefined}
+									className={cn(onRowClick && "cursor-pointer")}>
 									{columns.map((column) => (
 										<td key={String(column.key)} className={column.className}>
 											{renderCell(item, column)}
 										</td>
 									))}
 									{hasActions && (
-										<td>
+										<td onClick={(e) => e.stopPropagation()}>
 											<DropdownMenu>
 												<DropdownMenuTrigger asChild>
 													<Button

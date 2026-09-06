@@ -2,6 +2,7 @@ import { endpoints } from "./api-config";
 import { API_BASE_URL } from "./api-config";
 import { getToken, getRefreshToken, setAuth, clearAuth, getUser } from "./auth";
 import type {
+	AuditLog,
 	CreditCard,
 	DiscountCode,
 	Employee,
@@ -555,6 +556,12 @@ export const restApi = {
 			apiRequest<void>(`${endpoints.newsletter}/admin/${id}`, {
 				method: "DELETE",
 			}),
+	},
+	/** Read-only — every logged change is written by the backend's audit-log
+	 *  plugin, never created directly through this API. */
+	auditLogs: {
+		getAll: (params?: { model?: string; action?: string; userId?: string; limit?: number }) =>
+			apiRequest<AuditLog[]>(`${endpoints.auditLogs}${buildQuery(params ?? {})}`),
 	},
 };
 

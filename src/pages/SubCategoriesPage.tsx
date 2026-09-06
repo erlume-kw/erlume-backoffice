@@ -51,8 +51,9 @@ export default function SubCategoriesPage() {
 		error,
 		reload,
 	} = useResourceList(loadSubCategories);
-	const { data: categories } = useResourceList(loadCategories);
-	const { data: demands } = useResourceList(loadDemands);
+	const { data: categories, reload: reloadCategories } = useResourceList(loadCategories);
+	const { data: demands, reload: reloadDemands } = useResourceList(loadDemands);
+	const handleRefresh = () => { void Promise.all([reload(), reloadCategories(), reloadDemands()]); };
 
 	const categoryNameById = useMemo(
 		() => new Map(categories.map((cat) => [cat._id, cat.name])),
@@ -229,6 +230,8 @@ export default function SubCategoriesPage() {
 				searchValue={search}
 				onSearchChange={setSearch}
 				searchPlaceholder="Search subcategories..."
+				onRefresh={handleRefresh}
+				refreshing={loading}
 				onAdd={() => {
 					setEditingSubCategory(null);
 					setFormCategoryId("");

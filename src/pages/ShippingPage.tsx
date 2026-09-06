@@ -165,6 +165,8 @@ export default function ShippingPage() {
 				searchValue={search}
 				onSearchChange={setSearch}
 				searchPlaceholder="Search methods..."
+				onRefresh={reload}
+				refreshing={loading}
 				onAdd={openCreate}
 				addLabel="Add Method"
 			/>

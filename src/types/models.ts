@@ -350,3 +350,19 @@ export interface NewsletterSubscriber {
 	createdAt: string;
 	updatedAt: string;
 }
+
+export type AuditAction = "create" | "update" | "delete";
+
+export interface AuditLog {
+	_id: string;
+	modelName: string;
+	action: AuditAction;
+	resourceId: string;
+	resourceLabel?: string;
+	userId?: string;
+	userEmail?: string;
+	before?: Record<string, unknown>;
+	after?: Record<string, unknown>;
+	changedFields?: string[];
+	createdAt: string;
+}

@@ -81,10 +81,11 @@ export default function TransactionsPage() {
 		error,
 		reload,
 	} = useResourceList(loadTransactions);
-	const { data: orders } = useResourceList(loadOrders);
-	const { data: discountCodes } = useResourceList(loadDiscounts);
+	const { data: orders, reload: reloadOrders } = useResourceList(loadOrders);
+	const { data: discountCodes, reload: reloadDiscountCodes } = useResourceList(loadDiscounts);
 	const { data: transactionStatus } = useResourceList(loadTransactionStatus);
 	const { data: paymentMethods } = useResourceList(loadPaymentMethods);
+	const handleRefresh = () => { void Promise.all([reload(), reloadOrders(), reloadDiscountCodes()]); };
 
 	const safeOrders = Array.isArray(orders) ? orders : [];
 	const orderLabelById = useMemo(
@@ -294,6 +295,8 @@ export default function TransactionsPage() {
 				searchValue={search}
 				onSearchChange={setSearch}
 				searchPlaceholder="Search transactions..."
+				onRefresh={handleRefresh}
+				refreshing={loading}
 				onAdd={openCreateForm}
 				addLabel="Add transaction"
 			/>

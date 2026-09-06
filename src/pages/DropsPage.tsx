@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/select";
 import ImageUploader from "@/components/common/ImageUploader";
 import type { Drop, Item } from "@/types/models";
-import { Zap, Calendar } from "lucide-react";
+import { Zap, Calendar, EyeOff } from "lucide-react";
 import { restApi } from "@/lib/rest-client";
 import { getEnumOptions, getEnumValues } from "@/lib/enums";
 import { useResourceList } from "@/hooks/use-resource-list";
@@ -49,8 +49,9 @@ export default function DropsPage() {
 	const loadItems = useCallback(() => restApi.items.getAll(), []);
 
 	const { data: drops, loading, error, reload } = useResourceList(loadDrops);
-	const { data: dropStatus } = useResourceList(loadDropStatus);
-	const { data: items } = useResourceList(loadItems);
+	const { data: dropStatus, reload: reloadDropStatus } = useResourceList(loadDropStatus);
+	const { data: items, reload: reloadItems } = useResourceList(loadItems);
+	const handleRefresh = () => { void Promise.all([reload(), reloadDropStatus(), reloadItems()]); };
 
 	const dropStatusValues = getEnumValues("dropStatus", dropStatus);
 	const dropStatusOptions = getEnumOptions("dropStatus", dropStatusValues);
@@ -110,9 +111,13 @@ export default function DropsPage() {
 				<div className="flex items-center gap-3">
 					<div
 						className={`p-2 rounded-lg ${drop.status === "active" ? "bg-success/10" : drop.status === "upcoming" ? "bg-primary/10" : "bg-muted"}`}>
-						<Zap
-							className={`h-4 w-4 ${drop.status === "active" ? "text-success" : drop.status === "upcoming" ? "text-primary" : "text-muted-foreground"}`}
-						/>
+						{drop.status === "hidden" ? (
+							<EyeOff className="h-4 w-4 text-muted-foreground" />
+						) : (
+							<Zap
+								className={`h-4 w-4 ${drop.status === "active" ? "text-success" : drop.status === "upcoming" ? "text-primary" : "text-muted-foreground"}`}
+							/>
+						)}
 					</div>
 					<div>
 						<p className="font-medium text-foreground">{drop.name}</p>
@@ -266,6 +271,8 @@ export default function DropsPage() {
 				searchValue={search}
 				onSearchChange={setSearch}
 				searchPlaceholder="Search drops..."
+				onRefresh={handleRefresh}
+				refreshing={loading}
 				onAdd={openCreateForm}
 				addLabel="Create Drop"
 			/>
@@ -312,10 +319,14 @@ export default function DropsPage() {
 					<div className="space-y-6">
 						<div className="flex items-center gap-4">
 							<div
-								className={`p-3 rounded-lg ${selectedDrop.status === "active" ? "bg-success/10" : "bg-primary/10"}`}>
-								<Zap
-									className={`h-6 w-6 ${selectedDrop.status === "active" ? "text-success" : "text-primary"}`}
-								/>
+								className={`p-3 rounded-lg ${selectedDrop.status === "active" ? "bg-success/10" : selectedDrop.status === "hidden" ? "bg-muted" : "bg-primary/10"}`}>
+								{selectedDrop.status === "hidden" ? (
+									<EyeOff className="h-6 w-6 text-muted-foreground" />
+								) : (
+									<Zap
+										className={`h-6 w-6 ${selectedDrop.status === "active" ? "text-success" : "text-primary"}`}
+									/>
+								)}
 							</div>
 							<div>
 								<h3 className="text-lg font-semibold">{selectedDrop.name}</h3>

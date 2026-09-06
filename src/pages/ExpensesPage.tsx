@@ -56,9 +56,10 @@ export default function ExpensesPage() {
 		error,
 		reload,
 	} = useResourceList(loadExpenses);
-	const { data: employeesRaw = [] } = useResourceList(loadEmployees);
+	const { data: employeesRaw = [], reload: reloadEmployees } = useResourceList(loadEmployees);
 	const employees = Array.isArray(employeesRaw) ? employeesRaw : [];
-	const { data: expenseTypes } = useResourceList(loadExpenseTypes);
+	const { data: expenseTypes, reload: reloadExpenseTypes } = useResourceList(loadExpenseTypes);
+	const handleRefresh = () => { void Promise.all([reload(), reloadEmployees(), reloadExpenseTypes()]); };
 
 	const employeeLabelById = useMemo(() => {
 		const map = new Map<string, string>();
@@ -346,6 +347,8 @@ export default function ExpensesPage() {
 				searchValue={search}
 				onSearchChange={setSearch}
 				searchPlaceholder="Search expenses..."
+				onRefresh={handleRefresh}
+				refreshing={loading}
 				onAdd={() => {
 					setEditingExpense(null);
 					setFormEmployeeId("");

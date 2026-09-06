@@ -44,4 +44,5 @@ export const endpoints = {
 	enums: `${API_BASE_URL}/enums`,
 	shipping: `${API_BASE_URL}/shipping`,
 	newsletter: `${API_BASE_URL}/newsletter`,
+	auditLogs: `${API_BASE_URL}/audit-logs`,
 } as const;
