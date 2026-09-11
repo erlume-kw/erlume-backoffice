@@ -35,6 +35,8 @@ import {
 } from "lucide-react";
 import type { Quote, QuoteItemRef, QuoteSellerRef } from "@/types/models";
 import { restApi } from "@/lib/rest-client";
+import { endpoints } from "@/lib/api-config";
+import { getToken } from "@/lib/auth";
 import { useResourceList } from "@/hooks/use-resource-list";
 import { useToast } from "@/hooks/use-toast";
 import { formatApiError } from "@/lib/error-utils";
@@ -278,6 +280,33 @@ export default function QuotesPage() {
 			.slice(0, 20);
 	}, [sellers, sellerQuery]);
 
+	// The PDF comes from an admin-only endpoint, so a plain <a href> will not
+	// work — it cannot carry the Bearer token. Fetch it, then hand the browser
+	// a blob with the right filename. (The endpoint also falls back to Zoho
+	// when a quote has no stored backup, so this is offered on every row.)
+	const downloadPdf = async (quote: Quote) => {
+		try {
+			const res = await fetch(`${endpoints.quotes}/${quote.estimateNumber}/pdf`, {
+				headers: { Authorization: `Bearer ${getToken() ?? ""}` },
+			});
+			if (!res.ok) {
+				const body = await res.json().catch(() => ({}));
+				throw new Error((body as { error?: string }).error ?? `Download failed (${res.status})`);
+			}
+			const blob = await res.blob();
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement("a");
+			a.href = url;
+			a.download = `${quote.estimateNumber}.pdf`;
+			document.body.appendChild(a);
+			a.click();
+			a.remove();
+			URL.revokeObjectURL(url);
+		} catch (err) {
+			toast({ title: "Download failed", description: formatApiError(err) ?? (err as Error).message, variant: "destructive" });
+		}
+	};
+
 	const columns: Column<Quote>[] = [
 		{
 			key: "estimateNumber",
@@ -382,14 +411,10 @@ export default function QuotesPage() {
 								Unlink
 							</DropdownMenuItem>
 						)}
-						{q.pdfUrl && (
-							<DropdownMenuItem asChild>
-								<a href={q.pdfUrl} target="_blank" rel="noreferrer">
-									<FileDown className="h-4 w-4 mr-2" />
-									Download PDF
-								</a>
-							</DropdownMenuItem>
-						)}
+						<DropdownMenuItem onClick={() => void downloadPdf(q)}>
+							<FileDown className="h-4 w-4 mr-2" />
+							Download PDF
+						</DropdownMenuItem>
 						<DropdownMenuItem onClick={() => void openEditDialog(q)}>
 							<Pencil className="h-4 w-4 mr-2" />
 							Edit seller
