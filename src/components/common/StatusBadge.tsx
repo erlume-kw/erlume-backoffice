@@ -55,6 +55,10 @@ interface StatusBadgeProps {
 }
 
 const statusStyles: Record<string, string> = {
+  // Quote statuses
+  accepted: 'status-active',
+  declined: 'status-inactive',
+  expired: 'status-inactive',
   // Active/Success states
   active: 'status-active',
   approved: 'status-active',

@@ -45,4 +45,6 @@ export const endpoints = {
 	shipping: `${API_BASE_URL}/shipping`,
 	newsletter: `${API_BASE_URL}/newsletter`,
 	auditLogs: `${API_BASE_URL}/audit-logs`,
+	/** GET /api/pricing-tool/quotes — consignment quote records (admin only) */
+	quotes: `${API_BASE_URL}/pricing-tool/quotes`,
 } as const;

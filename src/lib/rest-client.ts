@@ -12,6 +12,7 @@ import type {
 	Order,
 	OrderItem,
 	OutfitItem,
+	Quote,
 	Sale,
 	ShippingMethod,
 	SubCategory,
@@ -559,6 +560,55 @@ export const restApi = {
 	},
 	/** Read-only — every logged change is written by the backend's audit-log
 	 *  plugin, never created directly through this API. */
+	/**
+	 * Consignment quotes (pricing tool). Admin only.
+	 * Note: :id accepts a Quote._id OR an estimateNumber (e.g. QT-61885745),
+	 * so the handle printed on the intake tag can be typed straight in.
+	 */
+	quotes: {
+		getAll: (params?: {
+			unlinked?: boolean;
+			sellerId?: string;
+			q?: string;
+			days?: number;
+			limit?: number;
+		}) => apiRequest<Quote[]>(`${endpoints.quotes}${buildQuery(params ?? {})}`),
+		getById: (id: string) => apiRequest<Quote>(`${endpoints.quotes}/${id}`),
+		/** Attach a quote to an Item. force:true moves one already linked elsewhere. */
+		link: (id: string, itemId: string, force = false) =>
+			apiRequest<{ quoteId: string; estimateNumber: string; itemId: string; pdfUrl: string | null }>(
+				`${endpoints.quotes}/${id}/link`,
+				{ method: "POST", body: JSON.stringify({ itemId, force }) },
+			),
+		unlink: (id: string) =>
+			apiRequest<{ quoteId: string; unlinkedFrom: string | null }>(
+				`${endpoints.quotes}/${id}/unlink`,
+				{ method: "POST" },
+			),
+		/**
+		 * Correct a quote record — mainly re-assigning the seller when the wrong
+		 * contact was picked in the pricing tool. Passing sellerId: null turns it
+		 * back into a walk-in. Edits the backend record only; the Zoho estimate
+		 * keeps the customer it was created with.
+		 */
+		update: (
+			id: string,
+			data: {
+				sellerId?: string | null;
+				status?: string;
+				contact?: { name?: string; phone?: string; email?: string };
+			},
+		) => apiRequest<Quote>(`${endpoints.quotes}/${id}`, {
+			method: "PATCH",
+			body: JSON.stringify(data),
+		}),
+		/** Deletes the record only — the Zoho estimate is NOT voided. */
+		delete: (id: string, force = false) =>
+			apiRequest<{ estimateNumber: string }>(
+				`${endpoints.quotes}/${id}${force ? "?force=true" : ""}`,
+				{ method: "DELETE" },
+			),
+	},
 	auditLogs: {
 		getAll: (params?: { model?: string; action?: string; userId?: string; limit?: number }) =>
 			apiRequest<AuditLog[]>(`${endpoints.auditLogs}${buildQuery(params ?? {})}`),

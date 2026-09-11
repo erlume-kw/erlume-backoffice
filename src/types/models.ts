@@ -366,3 +366,51 @@ export interface AuditLog {
 	changedFields?: string[];
 	createdAt: string;
 }
+
+export type QuoteStatus = "pending" | "accepted" | "declined" | "expired";
+
+/** Populated shapes: the list endpoint populates seller_id and item_id. */
+export interface QuoteSellerRef {
+	_id: string;
+	fullName?: string;
+	phoneNumber?: string;
+	emailAddress?: string;
+}
+
+export interface QuoteItemRef {
+	_id: string;
+	itemName?: string;
+	brandName?: string;
+	itemStatus?: string;
+}
+
+export interface Quote {
+	_id: string;
+	/** Zoho Estimate id */
+	estimateId: string;
+	/** Human handle, e.g. QT-61885745 — printed on the intake tag */
+	estimateNumber: string;
+	estimateUrl: string;
+	/** Cloudinary re-host of the Zoho PDF. The durable backup. */
+	pdfUrl?: string;
+	/**
+	 * References Seller._id (NOT User._id — Item.seller_id references User).
+	 * Null for walk-in quotes, where `contact` is populated instead.
+	 */
+	seller_id?: QuoteSellerRef | string | null;
+	contact?: { name?: string; phone?: string; email?: string };
+	brand?: string;
+	model?: string;
+	bagName?: string;
+	listingPrice: number;
+	sellerPayout: number;
+	erlumeCut?: number;
+	commissionRate?: number;
+	/** Null until the bag is intaken and linked to an Item. */
+	item_id?: QuoteItemRef | string | null;
+	linkedAt?: string;
+	status: QuoteStatus;
+	backfilledBy?: string;
+	createdAt: string;
+	updatedAt: string;
+}
