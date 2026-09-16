@@ -60,6 +60,7 @@ export default function OrdersPage() {
 	const [guestGovernorate, setGuestGovernorate] = useState("");
 	const [guestHouse, setGuestHouse] = useState("");
 	const [guestFlat, setGuestFlat] = useState("");
+	const [guestAvenue, setGuestAvenue] = useState("");
 	const [governorateOptions, setGovernorateOptions] = useState<string[]>([]);
 	const [cityOptions, setCityOptions] = useState<string[]>([]);
 	const [governorateCitiesMap, setGovernorateCitiesMap] = useState<Record<string, string[]>>({});
@@ -138,6 +139,11 @@ export default function OrdersPage() {
 					user.emailAddress || user.phoneNumber || user._id,
 				]),
 			),
+		[users],
+	);
+
+	const userAddressById = useMemo(
+		() => new Map(users.map((user) => [user._id, user.address])),
 		[users],
 	);
 	const getRefId = (value: unknown): string => {
@@ -607,6 +613,7 @@ export default function OrdersPage() {
 							governorate: guestGovernorate,
 							house: guestHouse,
 							...(guestFlat && { flat: guestFlat }),
+							...(guestAvenue && { avenue: guestAvenue }),
 						},
 					};
 				} else {
@@ -718,7 +725,7 @@ export default function OrdersPage() {
 					setOrderType("registered");
 					setGuestName(""); setGuestPhone(""); setGuestEmail("");
 					setGuestStreet(""); setGuestCity(""); setGuestBlock("");
-					setGuestGovernorate(""); setGuestHouse(""); setGuestFlat("");
+					setGuestGovernorate(""); setGuestHouse(""); setGuestFlat(""); setGuestAvenue("");
 					setExistingOrderItems([]);
 					setOrderItemsInitialized(false);
 					setShowForm(true);
@@ -887,10 +894,21 @@ export default function OrdersPage() {
 										</p>
 									</div>
 								) : (
-									<>
-										<span className="font-mono text-sm">{getUserIdValue(selectedOrder.user_id)}</span>
-										<span className="text-xs text-muted-foreground">{getUserLabel(selectedOrder.user_id)}</span>
-									</>
+									<div className="text-sm">
+										<p className="font-medium text-foreground">{getUserLabel(selectedOrder.user_id)}</p>
+										<span className="font-mono text-xs text-muted-foreground">{getUserIdValue(selectedOrder.user_id)}</span>
+										{(() => {
+											const addr = userAddressById.get(getUserIdValue(selectedOrder.user_id));
+											if (!addr) return null;
+											return (
+												<p className="text-xs mt-1">
+													{[addr.house, addr.street, addr.block, addr.city, addr.governorate].filter(Boolean).join(", ")}
+													{addr.avenue && `, Avenue ${addr.avenue}`}
+													{addr.flat && `, Flat ${addr.flat}`}
+												</p>
+											);
+										})()}
+									</div>
 								)}
 							</div>
 							<div className="flex items-center gap-3 text-muted-foreground">
@@ -977,7 +995,7 @@ export default function OrdersPage() {
 					setOrderType("registered");
 					setGuestName(""); setGuestPhone(""); setGuestEmail("");
 					setGuestStreet(""); setGuestCity(""); setGuestBlock("");
-					setGuestGovernorate(""); setGuestHouse(""); setGuestFlat("");
+					setGuestGovernorate(""); setGuestHouse(""); setGuestFlat(""); setGuestAvenue("");
 					setExistingOrderItems([]);
 					setOrderItemsInitialized(false);
 				}}
@@ -1093,6 +1111,10 @@ export default function OrdersPage() {
 										<div className="space-y-1">
 											<Label className="text-xs">Flat (optional)</Label>
 											<Input value={guestFlat} onChange={(e) => setGuestFlat(e.target.value)} placeholder="Flat no." />
+										</div>
+										<div className="space-y-1">
+											<Label className="text-xs">Avenue (optional)</Label>
+											<Input value={guestAvenue} onChange={(e) => setGuestAvenue(e.target.value)} placeholder="Avenue" />
 										</div>
 									</div>
 								</div>
