@@ -466,6 +466,13 @@ export const restApi = {
 			}),
 	},
 	ordersExtra: {
+		/** POST /api/orders/{id}/refund — approve the refund for a RETURNED order
+		 *  (issues MyFatoorah refund + buyer/team emails). Only valid when the order
+		 *  is in the `returned` status. */
+		refundReturn: (id: string) =>
+			apiRequest<{ success: boolean; message?: string }>(`${endpoints.orders}/${id}/refund`, {
+				method: "POST",
+			}),
 		/** PATCH /api/orders/{id}/status — body uses order_status to align with OpenAPI. */
 		updateStatus: (id: string, order_status: string) =>
 			apiRequest(`${endpoints.orders}/${id}/status`, {

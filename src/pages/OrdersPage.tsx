@@ -521,6 +521,21 @@ export default function OrdersPage() {
 		}
 	};
 
+	// Approve the refund for a RETURNED order (second step, after inspection):
+	// issues the MyFatoorah refund + emails the customer and the team.
+	const handleRefundReturn = async (orderId: string) => {
+		if (!window.confirm("Approve the refund for this returned order? This issues a MyFatoorah refund and emails the customer.")) return;
+		try {
+			setFormError(null);
+			await restApi.ordersExtra.refundReturn(orderId);
+			await reload();
+		} catch (err) {
+			const message = err instanceof Error ? err.message : "Failed to issue refund";
+			setFormError(message);
+			console.error("Failed to refund return", err);
+		}
+	};
+
 	const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		setFormError(null);
@@ -934,6 +949,13 @@ export default function OrdersPage() {
 								Cancel Order
 							</Button>
 						</div>
+						{normalizeStatusValue(selectedOrder.order_status) === "returned" && (
+							<Button
+								className="w-full"
+								onClick={() => void handleRefundReturn(selectedOrder._id)}>
+								Approve refund (returned)
+							</Button>
+						)}
 					</div>
 				)}
 			</DetailPanel>
