@@ -882,6 +882,7 @@ export default function OrdersPage() {
 												selectedOrder.guestInfo.shippingAddress.city,
 												selectedOrder.guestInfo.shippingAddress.governorate,
 											].filter(Boolean).join(", ")}
+											{selectedOrder.guestInfo.shippingAddress.avenue && `, Avenue ${selectedOrder.guestInfo.shippingAddress.avenue}`}
 											{selectedOrder.guestInfo.shippingAddress.flat && `, Flat ${selectedOrder.guestInfo.shippingAddress.flat}`}
 										</p>
 									</div>
