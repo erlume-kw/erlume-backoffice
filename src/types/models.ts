@@ -7,6 +7,7 @@ export interface Address {
 	governorate: string;
 	house: string;
 	flat?: string;
+	avenue?: string;
 }
 
 export interface User {
@@ -159,6 +160,7 @@ export interface Order {
 			governorate: string;
 			house: string;
 			flat?: string;
+			avenue?: string;
 		};
 	};
 	orderitem_ids: string[];

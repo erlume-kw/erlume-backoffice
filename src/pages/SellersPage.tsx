@@ -602,6 +602,7 @@ export default function SellersPage() {
 		const block = String(formData.get("block") || "").trim();
 		const house = String(formData.get("house") || "").trim();
 		const flat = String(formData.get("flat") || "").trim();
+		const avenue = String(formData.get("avenue") || "").trim();
 		const createPayload: Record<string, unknown> = {
 			password,
 			emailAddress,
@@ -613,6 +614,7 @@ export default function SellersPage() {
 				governorate: formGovernorate,
 				house,
 				...(flat ? { flat } : {}),
+				...(avenue ? { avenue } : {}),
 			},
 			roles: ["seller"], // Backend expects lowercase: "user" | "seller" | "admin"
 			cardIds: [],
@@ -1728,6 +1730,10 @@ export default function SellersPage() {
 									<div className="space-y-2">
 										<Label htmlFor="flat">Flat</Label>
 										<Input id="flat" name="flat" placeholder="Flat" />
+									</div>
+									<div className="space-y-2">
+										<Label htmlFor="avenue">Avenue</Label>
+										<Input id="avenue" name="avenue" placeholder="Avenue" />
 									</div>
 								</div>
 							</div>

@@ -389,6 +389,7 @@ export default function UsersPage() {
 			governorate: formGovernorate,
 			house: String(formData.get("house") || ""),
 			flat: String(formData.get("flat") || ""),
+			avenue: String(formData.get("avenue") || ""),
 		};
 		const payload = {
 			...(password ? { password } : {}),
@@ -1039,6 +1040,15 @@ export default function UsersPage() {
 									{fieldErrors["address.flat"]}
 								</div>
 							)}
+						</div>
+						<div className="space-y-2">
+							<Label htmlFor="avenue">Avenue</Label>
+							<Input
+								id="avenue"
+								name="avenue"
+								defaultValue={editingUser?.address?.avenue}
+								placeholder="Avenue"
+							/>
 						</div>
 					</div>
 					<div className="flex gap-3 pt-4">
