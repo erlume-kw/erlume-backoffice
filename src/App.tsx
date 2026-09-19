@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { NoticeProvider } from "@/components/common/NoticeDialog";
 
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
@@ -44,6 +45,7 @@ const App = () => (
 		<TooltipProvider>
 			<BrowserRouter>
 				<AuthProvider>
+					<NoticeProvider>
 					<Suspense fallback={routeFallback}>
 						<Routes>
 							<Route path="/login" element={<LoginPage />} />
@@ -71,6 +73,7 @@ const App = () => (
 							<Route path="*" element={<NotFound />} />
 						</Routes>
 					</Suspense>
+					</NoticeProvider>
 				</AuthProvider>
 			</BrowserRouter>
 		</TooltipProvider>

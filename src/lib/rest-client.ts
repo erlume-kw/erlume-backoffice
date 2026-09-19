@@ -78,8 +78,8 @@ async function attemptTokenRefresh(): Promise<string | null> {
 
 // A successful response can carry a `warning` (e.g. an order was cancelled but the
 // customer's refund did not go through). apiRequest unwraps `data`, so the message is
-// passed to whoever subscribed — the Orders page shows it as a popup.
-type ApiWarningListener = (message: string) => void;
+// passed to whoever subscribed — NoticeProvider shows it as a popup on every page.
+type ApiWarningListener = (message: string, title?: string) => void;
 const apiWarningListeners = new Set<ApiWarningListener>();
 
 export function onApiWarning(listener: ApiWarningListener): () => void {
@@ -90,9 +90,11 @@ export function onApiWarning(listener: ApiWarningListener): () => void {
 }
 
 function notifyApiWarning(parsed: unknown) {
-	const warning = (parsed as { warning?: unknown } | null)?.warning;
+	const body = parsed as { warning?: unknown; warningTitle?: unknown } | null;
+	const warning = body?.warning;
 	if (typeof warning === "string" && warning.trim()) {
-		apiWarningListeners.forEach((listener) => listener(warning));
+		const title = typeof body?.warningTitle === "string" ? body.warningTitle : undefined;
+		apiWarningListeners.forEach((listener) => listener(warning, title));
 	}
 }
 
