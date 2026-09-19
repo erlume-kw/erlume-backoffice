@@ -26,7 +26,16 @@ import type {
 } from "@/types/models";
 import { DateTimePicker } from "@/components/ui/date-picker";
 import { Package, Calendar, User as UserIcon } from "lucide-react";
-import { restApi } from "@/lib/rest-client";
+import { restApi, onApiWarning } from "@/lib/rest-client";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { API_BASE_URL } from "@/lib/api-config";
 import { getEnumOptions, getEnumValues } from "@/lib/enums";
 import { useResourceList } from "@/hooks/use-resource-list";
@@ -40,6 +49,14 @@ export default function OrdersPage() {
 	const [showForm, setShowForm] = useState(false);
 	const [editingOrder, setEditingOrder] = useState<Order | null>(null);
 	const [formError, setFormError] = useState<string | null>(null);
+	// Popup for problems the user must not miss: the API says an action went through with a
+	// problem (e.g. the order was cancelled but the customer's refund failed), or a delete
+	// was refused (e.g. the order is paid).
+	const [notice, setNotice] = useState<{ title: string; message: string } | null>(null);
+	useEffect(
+		() => onApiWarning((message) => setNotice({ title: "Refund did not go through", message })),
+		[],
+	);
 	const [formStatus, setFormStatus] = useState("pending");
 	const [itemSearch, setItemSearch] = useState("");
 	const [showSelectedOnly, setShowSelectedOnly] = useState(false);
@@ -463,6 +480,7 @@ export default function OrdersPage() {
 			const message =
 				err instanceof Error ? err.message : "Failed to delete order";
 			setFormError(message);
+			setNotice({ title: "Couldn't delete order", message });
 			console.error("Failed to delete order", err);
 		}
 	};
@@ -1458,6 +1476,23 @@ export default function OrdersPage() {
 					</div>
 				</form>
 			</DetailPanel>
+			<AlertDialog
+				open={notice !== null}
+				onOpenChange={(open) => {
+					if (!open) setNotice(null);
+				}}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>{notice?.title}</AlertDialogTitle>
+						<AlertDialogDescription>{notice?.message}</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogAction onClick={() => setNotice(null)}>
+							OK
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 		</AdminLayout>
 	);
 }

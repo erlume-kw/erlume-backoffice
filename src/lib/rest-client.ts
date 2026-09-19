@@ -76,6 +76,26 @@ async function attemptTokenRefresh(): Promise<string | null> {
 	}
 }
 
+// A successful response can carry a `warning` (e.g. an order was cancelled but the
+// customer's refund did not go through). apiRequest unwraps `data`, so the message is
+// passed to whoever subscribed — the Orders page shows it as a popup.
+type ApiWarningListener = (message: string) => void;
+const apiWarningListeners = new Set<ApiWarningListener>();
+
+export function onApiWarning(listener: ApiWarningListener): () => void {
+	apiWarningListeners.add(listener);
+	return () => {
+		apiWarningListeners.delete(listener);
+	};
+}
+
+function notifyApiWarning(parsed: unknown) {
+	const warning = (parsed as { warning?: unknown } | null)?.warning;
+	if (typeof warning === "string" && warning.trim()) {
+		apiWarningListeners.forEach((listener) => listener(warning));
+	}
+}
+
 // Generic REST API helper
 async function apiRequest<T>(
 	endpoint: string,
@@ -122,6 +142,7 @@ async function apiRequest<T>(
 				const retryText = await retryResponse.text();
 				if (!retryText.trim()) return undefined as T;
 				const parsed = JSON.parse(retryText);
+				notifyApiWarning(parsed);
 				if (parsed?.success === true && "data" in parsed) return parsed.data as T;
 				return parsed as T;
 			}
@@ -193,6 +214,7 @@ async function apiRequest<T>(
 	if (!text.trim()) return undefined as T;
 	try {
 		const parsed = JSON.parse(text);
+		notifyApiWarning(parsed);
 		// Handle wrapped response format: { success: true, data: T }
 		if (
 			parsed &&
