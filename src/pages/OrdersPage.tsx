@@ -42,7 +42,7 @@ export default function OrdersPage() {
 	const [editingOrder, setEditingOrder] = useState<Order | null>(null);
 	const [formError, setFormError] = useState<string | null>(null);
 	// Compact warning popup shared across the backoffice (API warnings show automatically)
-	const { notify } = useNotice();
+	const { notify, confirm } = useNotice();
 	const [formStatus, setFormStatus] = useState("pending");
 	const [itemSearch, setItemSearch] = useState("");
 	const [showSelectedOnly, setShowSelectedOnly] = useState(false);
@@ -514,12 +514,15 @@ export default function OrdersPage() {
 	};
 
 	const handleCancelOrder = async (orderId: string) => {
-		if (
-			!window.confirm(
-				"Cancel this order? The items go back on sale, and if the customer already paid they are refunded automatically and emailed.",
-			)
-		)
-			return;
+		const ok = await confirm({
+			title: "Cancel this order?",
+			message:
+				"The items go back on sale, and if the customer already paid they are refunded automatically and emailed.",
+			confirmText: "Cancel order",
+			cancelText: "Keep order",
+			destructive: true,
+		});
+		if (!ok) return;
 		try {
 			setFormError(null);
 			await restApi.ordersExtra.updateStatus(orderId, "cancelled");
@@ -540,7 +543,13 @@ export default function OrdersPage() {
 	// Approve the refund for a RETURNED order (second step, after inspection):
 	// issues the MyFatoorah refund + emails the customer and the team.
 	const handleRefundReturn = async (orderId: string) => {
-		if (!window.confirm("Approve the refund for this returned order? This issues a MyFatoorah refund and emails the customer.")) return;
+		const ok = await confirm({
+			title: "Approve this refund?",
+			message: "This issues a MyFatoorah refund for the returned order and emails the customer.",
+			confirmText: "Approve refund",
+			cancelText: "Not yet",
+		});
+		if (!ok) return;
 		try {
 			setFormError(null);
 			await restApi.ordersExtra.refundReturn(orderId);

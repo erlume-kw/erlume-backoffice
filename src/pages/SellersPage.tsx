@@ -21,10 +21,12 @@ import type { Item, Seller, User } from "@/types/models";
 import { DatePicker, DateTimePicker } from "@/components/ui/date-picker";
 import { Store, QrCode, CalendarCheck2 } from "lucide-react";
 import { restApi } from "@/lib/rest-client";
+import { useNotice } from "@/components/common/NoticeDialog";
 import { getEnumOptions, getEnumValues } from "@/lib/enums";
 import { useResourceList } from "@/hooks/use-resource-list";
 
 export default function SellersPage() {
+	const { notify, confirm } = useNotice();
 	const [search, setSearch] = useState("");
 	const [filters, setFilters] = useState<Record<string, string | undefined>>({
 		status: "active",
@@ -512,7 +514,7 @@ export default function SellersPage() {
 			void loadPayoutHistory(selectedSeller._id);
 			await reload();
 		} catch (err: any) {
-			alert(err.message);
+			notify({ title: "Something went wrong", message: err.message });
 		} finally {
 			setEditPayoutLoading(false);
 		}
@@ -520,7 +522,13 @@ export default function SellersPage() {
 
 	const handleDeletePayout = async (payoutId: string) => {
 		if (!selectedSeller) return;
-		if (!window.confirm("Delete this payout? The balance will be restored.")) return;
+		const ok = await confirm({
+			title: "Delete this payout?",
+			message: "The balance will be restored.",
+			confirmText: "Delete payout",
+			destructive: true,
+		});
+		if (!ok) return;
 		try {
 			const res = await fetch(`/api/payouts/${payoutId}`, {
 				method: "DELETE",
@@ -535,7 +543,7 @@ export default function SellersPage() {
 			void loadPayoutHistory(selectedSeller._id);
 			await reload();
 		} catch (err: any) {
-			alert(err.message);
+			notify({ title: "Something went wrong", message: err.message });
 		}
 	};
 

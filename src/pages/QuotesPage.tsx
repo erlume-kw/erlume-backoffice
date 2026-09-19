@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import type { Quote, QuoteItemRef, QuoteSellerRef } from "@/types/models";
 import { restApi } from "@/lib/rest-client";
+import { useNotice } from "@/components/common/NoticeDialog";
 import { endpoints } from "@/lib/api-config";
 import { getToken } from "@/lib/auth";
 import { useResourceList } from "@/hooks/use-resource-list";
@@ -74,6 +75,7 @@ interface QuoteFilters {
 
 export default function QuotesPage() {
 	const { toast } = useToast();
+	const { confirm } = useNotice();
 
 	const [search, setSearch] = useState("");
 	// Default to the unlinked backlog — that is the job this page exists for.
@@ -179,7 +181,7 @@ export default function QuotesPage() {
 			// wrong person). Both are warnings staff can consciously override.
 			const overridable = /already linked/i.test(msg) || /belongs to/i.test(msg);
 			if (!force && overridable) {
-				if (window.confirm(`${msg}\n\nLink them anyway?`)) {
+				if (await confirm({ title: "Link anyway?", message: msg, confirmText: "Link anyway", destructive: true })) {
 					setLinking(false);
 					await doLink(item, true);
 					return;
@@ -195,7 +197,13 @@ export default function QuotesPage() {
 	const doUnlink = async (quote: Quote) => {
 		const item = asItem(quote.item_id);
 		const label = item ? `${item.brandName ?? ""} ${item.itemName ?? ""}`.trim() : "its item";
-		if (!window.confirm(`Unlink ${quote.estimateNumber} from ${label}?`)) return;
+		const ok = await confirm({
+			title: "Unlink quote?",
+			message: `Unlink ${quote.estimateNumber} from ${label}?`,
+			confirmText: "Unlink",
+			destructive: true,
+		});
+		if (!ok) return;
 		try {
 			await restApi.quotes.unlink(quote.estimateNumber);
 			toast({ title: "Quote unlinked", description: quote.estimateNumber });
@@ -242,11 +250,14 @@ export default function QuotesPage() {
 	const doDelete = async (quote: Quote, force = false) => {
 		if (!force) {
 			// Spell out that Zoho is untouched — staff will assume otherwise.
-			const warning =
-				"Delete quote " + quote.estimateNumber + "?\n\n" +
-				"This removes the backend record only — the estimate still exists in Zoho " +
-				"and would need voiding there separately. This cannot be undone.";
-			if (!window.confirm(warning)) return;
+			const ok = await confirm({
+				title: `Delete quote ${quote.estimateNumber}?`,
+				message:
+					"This removes the backend record only — the estimate still exists in Zoho and would need voiding there separately. This cannot be undone.",
+				confirmText: "Delete",
+				destructive: true,
+			});
+			if (!ok) return;
 		}
 		try {
 			await restApi.quotes.delete(quote.estimateNumber, force);
@@ -256,7 +267,7 @@ export default function QuotesPage() {
 			const msg = formatApiError(err) ?? "";
 			// Deleting a linked quote would strip an item's history silently.
 			if (!force && /still linked/i.test(msg)) {
-				if (window.confirm(msg + "\n\nDelete it anyway?")) {
+				if (await confirm({ title: "Delete anyway?", message: msg, confirmText: "Delete anyway", destructive: true })) {
 					await doDelete(quote, true);
 					return;
 				}

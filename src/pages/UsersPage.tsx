@@ -20,12 +20,14 @@ import {
 import type { User } from "@/types/models";
 import { Mail, Phone, Calendar, User as UserIcon } from "lucide-react";
 import { restApi, ApiError } from "@/lib/rest-client";
+import { useNotice } from "@/components/common/NoticeDialog";
 import { getEnumOptions, getEnumValues } from "@/lib/enums";
 import { useResourceList } from "@/hooks/use-resource-list";
 
 const formatPhoneNumber = (value: string) => value.trim();
 
 export default function UsersPage() {
+	const { confirm } = useNotice();
 	const usersApi = restApi.users as unknown as {
 		getAll: (
 			params?: Record<string, string | number | boolean | undefined>,
@@ -668,14 +670,15 @@ export default function UsersPage() {
 							<Button
 								variant="destructive"
 								className="w-full"
-								onClick={() => {
-									if (
-										window.confirm(
-											`Permanently delete ${selectedUser.emailAddress}?\n\nThis removes the account, its seller record and active sessions, and cannot be undone. Their newsletter subscription (if any) is kept.`,
-										)
-									) {
-										void handleHardDelete(selectedUser._id);
-									}
+								onClick={async () => {
+									const ok = await confirm({
+										title: `Permanently delete ${selectedUser.emailAddress}?`,
+										message:
+											"This removes the account, its seller record and active sessions, and cannot be undone. Their newsletter subscription (if any) is kept.",
+										confirmText: "Delete permanently",
+										destructive: true,
+									});
+									if (ok) void handleHardDelete(selectedUser._id);
 								}}>
 								Permanently Delete
 							</Button>
