@@ -528,6 +528,12 @@ export default function OrdersPage() {
 	};
 
 	const handleCancelOrder = async (orderId: string) => {
+		if (
+			!window.confirm(
+				"Cancel this order? The items go back on sale, and if the customer already paid they are refunded automatically and emailed.",
+			)
+		)
+			return;
 		try {
 			setFormError(null);
 			await restApi.ordersExtra.updateStatus(orderId, "cancelled");
@@ -982,8 +988,11 @@ export default function OrdersPage() {
 							<Button
 								variant="destructive"
 								className="flex-1"
+								disabled={normalizeStatusValue(selectedOrder.order_status) === "cancelled"}
 								onClick={() => void handleCancelOrder(selectedOrder._id)}>
-								Cancel Order
+								{normalizeStatusValue(selectedOrder.order_status) === "cancelled"
+									? "Order cancelled"
+									: "Cancel Order"}
 							</Button>
 						</div>
 						{normalizeStatusValue(selectedOrder.order_status) === "returned" && (
