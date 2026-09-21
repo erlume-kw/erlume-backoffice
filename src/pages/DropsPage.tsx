@@ -227,7 +227,9 @@ export default function DropsPage() {
 		const formData = new FormData(event.currentTarget);
 		const payload = {
 			name: String(formData.get("name") || ""),
+			nameAr: String(formData.get("nameAr") || ""),
 			description: String(formData.get("description") || ""),
+			descriptionAr: String(formData.get("descriptionAr") || ""),
 			releaseDate: formReleaseDate ? formReleaseDate.toISOString().slice(0, 10) : "",
 			status: String(formData.get("status") || "upcoming"),
 			bannerImageUrl: formBannerUrl[0] ?? undefined,
@@ -336,6 +338,14 @@ export default function DropsPage() {
 						<p className="text-muted-foreground">
 							{selectedDrop.description || "—"}
 						</p>
+						{(selectedDrop.nameAr || selectedDrop.descriptionAr) && (
+							<div className="space-y-1 rounded-lg bg-muted/30 p-3" dir="rtl">
+								{selectedDrop.nameAr && <p className="font-semibold">{selectedDrop.nameAr}</p>}
+								{selectedDrop.descriptionAr && (
+									<p className="text-muted-foreground">{selectedDrop.descriptionAr}</p>
+								)}
+							</div>
+						)}
 						<div className="grid grid-cols-2 gap-4">
 							<div className="p-3 bg-muted/30 rounded-lg col-span-2">
 								<div className="flex items-center gap-2 mb-1">
@@ -380,12 +390,33 @@ export default function DropsPage() {
 						/>
 					</div>
 					<div className="space-y-2">
+						<Label htmlFor="nameAr">Arabic name (optional)</Label>
+						<Input
+							id="nameAr"
+							name="nameAr"
+							dir="rtl"
+							defaultValue={editingDrop?.nameAr}
+							placeholder="الاسم بالعربية"
+						/>
+					</div>
+					<div className="space-y-2">
 						<Label htmlFor="description">Description</Label>
 						<Textarea
 							id="description"
 							name="description"
 							defaultValue={editingDrop?.description}
 							placeholder="Enter description"
+							rows={3}
+						/>
+					</div>
+					<div className="space-y-2">
+						<Label htmlFor="descriptionAr">Arabic description (optional)</Label>
+						<Textarea
+							id="descriptionAr"
+							name="descriptionAr"
+							dir="rtl"
+							defaultValue={editingDrop?.descriptionAr}
+							placeholder="الوصف بالعربية"
 							rows={3}
 						/>
 					</div>

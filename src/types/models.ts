@@ -110,7 +110,11 @@ export interface Item {
 export interface Drop {
 	_id: string;
 	name: string;
+	/** Arabic name shown on the Arabic site; English is used when empty. */
+	nameAr?: string;
 	description?: string;
+	/** Arabic description shown on the Arabic site; English is used when empty. */
+	descriptionAr?: string;
 	releaseDate: string;
 	status: string;
 	bannerImageUrl?: string;
