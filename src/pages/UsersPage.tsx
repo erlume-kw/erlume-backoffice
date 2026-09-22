@@ -23,11 +23,27 @@ import { restApi, ApiError } from "@/lib/rest-client";
 import { useNotice } from "@/components/common/NoticeDialog";
 import { getEnumOptions, getEnumValues } from "@/lib/enums";
 import { useResourceList } from "@/hooks/use-resource-list";
+import { formatApiError } from "@/lib/error-utils";
 
 const formatPhoneNumber = (value: string) => value.trim();
 
 export default function UsersPage() {
-	const { confirm } = useNotice();
+	const { confirm, notify } = useNotice();
+	const [savingLanguage, setSavingLanguage] = useState(false);
+
+	const handleSetLanguage = async (user: User, lang: "en" | "ar") => {
+		if (user.preferredLanguage === lang || savingLanguage) return;
+		setSavingLanguage(true);
+		try {
+			await restApi.usersExtra.patch(user._id, { preferredLanguage: lang });
+			setSelectedUser((prev) => (prev && prev._id === user._id ? { ...prev, preferredLanguage: lang } : prev));
+			void reload();
+		} catch (err) {
+			notify({ title: "Couldn't save language", message: formatApiError(err) });
+		} finally {
+			setSavingLanguage(false);
+		}
+	};
 	const usersApi = restApi.users as unknown as {
 		getAll: (
 			params?: Record<string, string | number | boolean | undefined>,
@@ -50,6 +66,7 @@ export default function UsersPage() {
 	const [formStatus, setFormStatus] = useState("active");
 	const [formGovernorate, setFormGovernorate] = useState("");
 	const [formCity, setFormCity] = useState("");
+	const [formLanguage, setFormLanguage] = useState(""); // "" = not set
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
 	const [showBulkUpdate, setShowBulkUpdate] = useState(false);
 	const [bulkRole, setBulkRole] = useState("");
@@ -401,6 +418,7 @@ export default function UsersPage() {
 			cardIds: editingUser?.cardIds ?? [],
 			isDeleted,
 			address,
+			...(formLanguage ? { preferredLanguage: formLanguage } : {}),
 		};
 
 		// Debug: Verify roles are lowercase before sending
@@ -606,6 +624,7 @@ export default function UsersPage() {
 						setFormStatus(user.isDeleted ? "inactive" : "active");
 						setFormGovernorate(user.address?.governorate || "");
 						setFormCity(user.address?.city || "");
+						setFormLanguage(user.preferredLanguage || "");
 						setShowForm(true);
 					}}
 					onDelete={(user) => {
@@ -655,6 +674,32 @@ export default function UsersPage() {
 									Joined {new Date(selectedUser.createdAt).toLocaleDateString()}
 								</span>
 							</div>
+						</div>
+						<div className="pt-4 border-t border-border space-y-2">
+							<Label className="text-xs text-muted-foreground">
+								Preferred communication language
+							</Label>
+							<div className="flex gap-2">
+								{(["en", "ar"] as const).map((lang) => {
+									const active = (selectedUser.preferredLanguage ?? "en") === lang;
+									return (
+										<Button
+											key={lang}
+											type="button"
+											size="sm"
+											variant={active ? "default" : "outline"}
+											disabled={savingLanguage}
+											onClick={() => void handleSetLanguage(selectedUser, lang)}>
+											{lang === "en" ? "English" : "Arabic"}
+										</Button>
+									);
+								})}
+							</div>
+							{!selectedUser.preferredLanguage && (
+								<p className="text-xs text-muted-foreground">
+									Not set — emails currently follow the page they order on.
+								</p>
+							)}
 						</div>
 						<div className="pt-4 border-t border-border space-y-3">
 							<Button
@@ -838,6 +883,21 @@ export default function UsersPage() {
 								</SelectContent>
 							</Select>
 						</div>
+					</div>
+					<div className="space-y-2">
+						<Label htmlFor="language">Preferred communication language</Label>
+						<Select
+							value={formLanguage || "unset"}
+							onValueChange={(value) => setFormLanguage(value === "unset" ? "" : value)}>
+							<SelectTrigger>
+								<SelectValue placeholder="Not set" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="unset">Not set (follows the page they order on)</SelectItem>
+								<SelectItem value="en">English</SelectItem>
+								<SelectItem value="ar">Arabic</SelectItem>
+							</SelectContent>
+						</Select>
 					</div>
 					<div className="grid grid-cols-2 gap-4">
 						<div className="space-y-2">

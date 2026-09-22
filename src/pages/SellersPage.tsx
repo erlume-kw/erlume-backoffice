@@ -24,9 +24,25 @@ import { restApi } from "@/lib/rest-client";
 import { useNotice } from "@/components/common/NoticeDialog";
 import { getEnumOptions, getEnumValues } from "@/lib/enums";
 import { useResourceList } from "@/hooks/use-resource-list";
+import { formatApiError } from "@/lib/error-utils";
 
 export default function SellersPage() {
 	const { notify, confirm } = useNotice();
+	const [savingSellerLanguage, setSavingSellerLanguage] = useState(false);
+
+	const handleSetSellerLanguage = async (seller: Seller, lang: "en" | "ar") => {
+		if (seller.preferredLanguage === lang || savingSellerLanguage) return;
+		setSavingSellerLanguage(true);
+		try {
+			await restApi.sellers.patch(seller._id, { preferredLanguage: lang });
+			setSelectedSeller((prev) => (prev && prev._id === seller._id ? { ...prev, preferredLanguage: lang } : prev));
+			void reload();
+		} catch (err) {
+			notify({ title: "Couldn't save language", message: formatApiError(err) });
+		} finally {
+			setSavingSellerLanguage(false);
+		}
+	};
 	const [search, setSearch] = useState("");
 	const [filters, setFilters] = useState<Record<string, string | undefined>>({
 		status: "active",
@@ -44,6 +60,7 @@ export default function SellersPage() {
 	const [formIsDeactivated, setFormIsDeactivated] = useState(false);
 	const [formGovernorate, setFormGovernorate] = useState("");
 	const [formCity, setFormCity] = useState("");
+	const [formLanguage, setFormLanguage] = useState(""); // "" = not set
 	const [escalationStatusSelectValue, setEscalationStatusSelectValue] =
 		useState("__none__");
 	const [onboardingStatusSelectValue, setOnboardingStatusSelectValue] =
@@ -600,6 +617,7 @@ export default function SellersPage() {
 			sellerPolicyAcceptedAt: formPolicyAcceptedAt
 				? formPolicyAcceptedAt.toISOString()
 				: undefined,
+			...(formLanguage ? { preferredLanguage: formLanguage } : {}),
 		};
 		const password = String(formData.get("password") || "");
 		const emailAddress = String(formData.get("emailAddress") || "");
@@ -981,6 +999,7 @@ export default function SellersPage() {
 						setItemSearch("");
 						setFormUserId(getUserIdValue(seller.userId));
 						setUserSearch("");
+						setFormLanguage(seller.preferredLanguage || "");
 						setFormGovernorate("");
 						setFormCity("");
 						setFormIsDeactivated(!!seller.isDeactivated);
@@ -1121,6 +1140,32 @@ export default function SellersPage() {
 								<p className="text-sm font-mono">
 									{selectedSeller.IBAN || "—"}
 								</p>
+							</div>
+							<div className="p-3 bg-muted/30 rounded-lg col-span-2">
+								<Label className="text-xs text-muted-foreground">
+									Preferred communication language
+								</Label>
+								<div className="flex gap-2 mt-2">
+									{(["en", "ar"] as const).map((lang) => {
+										const active = (selectedSeller.preferredLanguage ?? "en") === lang;
+										return (
+											<Button
+												key={lang}
+												type="button"
+												size="sm"
+												variant={active ? "default" : "outline"}
+												disabled={savingSellerLanguage}
+												onClick={() => void handleSetSellerLanguage(selectedSeller, lang)}>
+												{lang === "en" ? "English" : "Arabic"}
+											</Button>
+										);
+									})}
+								</div>
+								{!selectedSeller.preferredLanguage && (
+									<p className="text-xs text-muted-foreground mt-1">
+										Not set — from the Google Form's language question, if answered.
+									</p>
+								)}
 							</div>
 
 							{/* Payout history */}
@@ -1304,6 +1349,7 @@ export default function SellersPage() {
 								setSelectedItemIds(selectedSeller.itemIds ?? []);
 								setFormUserId(getUserIdValue(selectedSeller.userId));
 								setUserSearch("");
+								setFormLanguage(selectedSeller.preferredLanguage || "");
 								setFormGovernorate("");
 								setFormCity("");
 								setFormIsDeactivated(!!selectedSeller.isDeactivated);
@@ -1501,6 +1547,21 @@ export default function SellersPage() {
 										/>
 										<span>Consent Given</span>
 									</label>
+								</div>
+								<div className="space-y-2">
+									<Label htmlFor="language">Preferred communication language</Label>
+									<Select
+										value={formLanguage || "unset"}
+										onValueChange={(value) => setFormLanguage(value === "unset" ? "" : value)}>
+										<SelectTrigger>
+											<SelectValue placeholder="Not set" />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="unset">Not set (from the Google Form, if answered)</SelectItem>
+											<SelectItem value="en">English</SelectItem>
+											<SelectItem value="ar">Arabic</SelectItem>
+										</SelectContent>
+									</Select>
 								</div>
 							</div>
 							<div className={formStep !== 3 ? "hidden" : undefined}>

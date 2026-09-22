@@ -19,6 +19,8 @@ export interface User {
 	roles: string[];
 	cardIds?: string[];
 	isDeleted?: boolean;
+	/** Language erlume writes to them in (emails today). Unset until they choose one. */
+	preferredLanguage?: "en" | "ar";
 	createdAt: string;
 	updatedAt: string;
 }
@@ -37,6 +39,8 @@ export interface Seller {
 	isDeactivated?: boolean;
 	consentGiven?: boolean;
 	preferredPickupDate?: string;
+	/** Language erlume writes to them in (emails today). Unset until they choose one. */
+	preferredLanguage?: "en" | "ar";
 	intakeTimestamp?: string;
 	sellerPolicyAcceptedAt?: string;
 	escalationStatus?: string;
