@@ -275,7 +275,7 @@ export default function ItemsPage() {
 							? Number(item.basePrice).toLocaleString()
 							: String(item.basePrice)}
 					</p>
-					<p className="text-sm text-muted-foreground">Sale {item.saleRate}%</p>
+					<p className="text-sm text-muted-foreground">Seller {item.saleRate}%</p>
 				</div>
 			),
 		},
@@ -457,7 +457,6 @@ export default function ItemsPage() {
 		event.preventDefault();
 		const formData = new FormData(event.currentTarget);
 		const basePrice = String(formData.get("basePrice") ?? "").trim();
-		const saleRate = String(formData.get("saleRate") ?? "").trim();
 		const quantity = String(formData.get("quantity") ?? "").trim();
 		const yearValue = String(formData.get("year") ?? "").trim();
 		const listingPriceValue = String(formData.get("listingPrice") ?? "").trim();
@@ -478,7 +477,7 @@ export default function ItemsPage() {
 			itemName: itemNameVal,
 			brandName: brandNameVal,
 			basePrice,
-			saleRate,
+			// saleRate is derived by the backend from the payout rule — never sent
 			itemStatus: formStatus,
 			condition: formCondition,
 			color: colorVal,
@@ -526,7 +525,6 @@ export default function ItemsPage() {
 			itemNameVal &&
 			brandNameVal &&
 			basePrice &&
-			saleRate &&
 			formStatus &&
 			formCondition &&
 			colorVal &&
@@ -537,7 +535,7 @@ export default function ItemsPage() {
 			payload.uploadedAt;
 		if (!hasAllRequired) {
 			setFormError(
-				"Please fill in all required fields (name, brand, price, sale rate, status, condition, color, size, quantity, category, listing price).",
+				"Please fill in all required fields (name, brand, price, status, condition, color, size, quantity, category, listing price).",
 			);
 			return;
 		}
@@ -845,7 +843,7 @@ export default function ItemsPage() {
 								</p>
 							</div>
 							<div className="p-3 bg-muted/30 rounded-lg">
-								<p className="text-sm text-muted-foreground">Sale Rate</p>
+								<p className="text-sm text-muted-foreground">Seller share</p>
 								<p className="text-lg font-semibold">
 									{selectedItem.saleRate}%
 								</p>
@@ -1315,17 +1313,16 @@ export default function ItemsPage() {
 										/>
 									</div>
 									<div className="space-y-2">
-										<Label htmlFor="saleRate">Sale Rate (%)</Label>
+										<Label htmlFor="saleRate">Seller share (auto)</Label>
 										<Input
 											id="saleRate"
-											name="saleRate"
-											type="number"
-											min="0"
-											max="100"
-											step="any"
-											defaultValue={editingItem?.saleRate}
-											placeholder="e.g. 20 for 20%"
+											value={editingItem?.saleRate ? `${editingItem.saleRate}%` : "Set on save"}
+											readOnly
+											disabled
 										/>
+										<p className="text-xs text-muted-foreground">
+											From the linked quote, else the pricing formula. Updates when the listing price changes.
+										</p>
 									</div>
 								</div>
 								<div className="grid grid-cols-2 gap-4">
