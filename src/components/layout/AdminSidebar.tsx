@@ -22,11 +22,13 @@ import {
 	Mail,
 	History,
 	LogOut,
+	Server,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
+import { ACTIVE_ENV, setEnvironment } from "@/lib/api-config";
 import logoUrl from "../../../erlume_Icon_1_Transparent_green.png";
 
 const navigation = [
@@ -148,6 +150,46 @@ export function AdminSidebar() {
 							);
 						})}
 					</ul>
+					{/* Environment switcher — points this one backoffice at dev or production
+					    at runtime (saved in localStorage; reloads on change). */}
+					<div className="pt-2 border-t border-sidebar-border">
+						{isCompact ? (
+							<button
+								type="button"
+								title={`Backend: ${ACTIVE_ENV}. Tap to switch.`}
+								onClick={() => setEnvironment(ACTIVE_ENV === "production" ? "dev" : "production")}
+								className={cn(
+									"sidebar-link w-full justify-center",
+									ACTIVE_ENV === "production" ? "text-destructive" : "text-muted-foreground",
+								)}>
+								<Server className="h-5 w-5 flex-shrink-0" />
+							</button>
+						) : (
+							<div className="px-1 pb-1">
+								<div className="mb-1 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+									<Server className="h-3.5 w-3.5" /> Environment
+								</div>
+								<div className="flex overflow-hidden rounded-md border border-sidebar-border text-xs">
+									{(["dev", "production"] as const).map((env) => (
+										<button
+											key={env}
+											type="button"
+											onClick={() => { if (ACTIVE_ENV !== env) setEnvironment(env); }}
+											className={cn(
+												"flex-1 px-2 py-1.5",
+												ACTIVE_ENV === env
+													? env === "production"
+														? "bg-destructive text-destructive-foreground font-medium"
+														: "bg-primary text-primary-foreground font-medium"
+													: "text-muted-foreground hover:bg-muted",
+											)}>
+											{env === "production" ? "Prod" : "Dev"}
+										</button>
+									))}
+								</div>
+							</div>
+						)}
+					</div>
 					<div className="pt-2 border-t border-sidebar-border">
 						<button
 							type="button"

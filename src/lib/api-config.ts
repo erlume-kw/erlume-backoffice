@@ -1,6 +1,40 @@
 // API Configuration
-const RAW_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
+//
+// The backend is resolved at RUNTIME (not baked into the build) so one deployed
+// backoffice can switch environments from the in-app toggle. Resolution order:
+//   1. a saved choice in localStorage (set by the Dev/Production switcher), else
+//   2. the build-time VITE_API_BASE_URL, else
+//   3. the dev backend.
+export const ENVIRONMENTS = {
+	dev: "https://api-dev.erlume.com.kw/api",
+	production: "https://api.erlume.com.kw/api",
+} as const;
+export type EnvName = keyof typeof ENVIRONMENTS;
+
+const ENV_STORAGE_KEY = "API_BASE_URL";
+
+function resolveApiBase(): string {
+	try {
+		const saved = localStorage.getItem(ENV_STORAGE_KEY);
+		if (saved) return saved;
+	} catch { /* storage blocked */ }
+	return (import.meta.env.VITE_API_BASE_URL as string) || ENVIRONMENTS.dev;
+}
+
+const RAW_API_BASE_URL = resolveApiBase();
 export const API_BASE_URL = RAW_API_BASE_URL.replace(/\/+$/, "");
+
+/** Which named environment is active (for the switcher UI), or "custom". */
+export const ACTIVE_ENV: EnvName | "custom" =
+	(Object.entries(ENVIRONMENTS).find(
+		([, url]) => url.replace(/\/+$/, "") === API_BASE_URL,
+	)?.[0] as EnvName | undefined) ?? "custom";
+
+/** Switch environment and reload so every endpoint picks up the new base. */
+export function setEnvironment(env: EnvName): void {
+	try { localStorage.setItem(ENV_STORAGE_KEY, ENVIRONMENTS[env]); } catch { /* storage blocked */ }
+	window.location.reload();
+}
 
 /** OpenAPI spec URL for backoffice (Swagger UI, codegen). Prefer loading from backend. */
 function getOpenApiSpecUrl(): string {
