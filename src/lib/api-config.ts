@@ -30,10 +30,12 @@ export const ACTIVE_ENV: EnvName | "custom" =
 		([, url]) => url.replace(/\/+$/, "") === API_BASE_URL,
 	)?.[0] as EnvName | undefined) ?? "custom";
 
-/** Switch environment and reload so every endpoint picks up the new base. */
+/** Switch environment and reload so every endpoint picks up the new base. Lands
+ *  on the root (not the current deep route) so the reload can't 404 before the
+ *  SPA has booted. */
 export function setEnvironment(env: EnvName): void {
 	try { localStorage.setItem(ENV_STORAGE_KEY, ENVIRONMENTS[env]); } catch { /* storage blocked */ }
-	window.location.reload();
+	window.location.assign("/");
 }
 
 /** OpenAPI spec URL for backoffice (Swagger UI, codegen). Prefer loading from backend. */
