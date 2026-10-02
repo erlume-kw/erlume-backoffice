@@ -22,10 +22,19 @@ export default function OutfitsPage() {
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
 	const [bulkLoading, setBulkLoading] = useState(false);
 	const loadOutfits = useCallback(() => restApi.outfits.getAll(), []);
-	const loadItems = useCallback(
-		() => restApi.items.getAll({ limit: 500 }) as Promise<Item[]>,
-		[],
-	);
+	const loadItems = useCallback(async () => {
+		const pageSize = 100;
+		const allItems: Item[] = [];
+		for (let page = 1; ; page++) {
+			const batch = (await restApi.items.getAll({
+				page,
+				limit: pageSize,
+			})) as Item[];
+			allItems.push(...batch);
+			if (batch.length < pageSize) break;
+		}
+		return allItems;
+	}, []);
 	const {
 		data: outfits,
 		loading,

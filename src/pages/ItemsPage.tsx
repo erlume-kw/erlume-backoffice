@@ -71,10 +71,19 @@ export default function ItemsPage() {
 	const [bulkCondition, setBulkCondition] = useState("");
 	const [bulkCategory, setBulkCategory] = useState("");
 	const [bulkLoading, setBulkLoading] = useState(false);
-	const loadItems = useCallback(
-		() => restApi.items.getAll({ limit: 500 }) as Promise<Item[]>,
-		[],
-	);
+	const loadItems = useCallback(async () => {
+		const pageSize = 100;
+		const allItems: Item[] = [];
+		for (let page = 1; ; page++) {
+			const batch = (await restApi.items.getAll({
+				page,
+				limit: pageSize,
+			})) as Item[];
+			allItems.push(...batch);
+			if (batch.length < pageSize) break;
+		}
+		return allItems;
+	}, []);
 	const loadDrops = useCallback(
 		() => restApi.drops.getAll() as Promise<Drop[]>,
 		[],
