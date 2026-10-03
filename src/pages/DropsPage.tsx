@@ -46,7 +46,20 @@ export default function DropsPage() {
 
 	const loadDrops = useCallback(() => restApi.drops.getAll(), []);
 	const loadDropStatus = useCallback(() => restApi.enums.getByCategory("dropStatus"), []);
-	const loadItems = useCallback(() => restApi.items.getAll(), []);
+	// The items list endpoint paginates (20/page, max 100), so a bare getAll()
+	// returns only the 20 newest bags — far fewer than what's eligible for a drop.
+	// Page through everything (limit 100) so the picker can see all approved/available bags.
+	const loadItems = useCallback(async () => {
+		const LIMIT = 100;
+		const all: Item[] = [];
+		for (let page = 1; page <= 50; page++) {
+			const batch = (await restApi.items.getAll({ page, limit: LIMIT })) as Item[];
+			if (!batch?.length) break;
+			all.push(...batch);
+			if (batch.length < LIMIT) break; // last page reached
+		}
+		return all;
+	}, []);
 
 	const { data: drops, loading, error, reload } = useResourceList(loadDrops);
 	const { data: dropStatus, reload: reloadDropStatus } = useResourceList(loadDropStatus);
@@ -67,12 +80,15 @@ export default function DropsPage() {
 		[items],
 	);
 
-	// Show approved items + items already in this drop
+	// Show bags that can go in a drop (approved or available) + whatever is
+	// already in this drop (even if its status has since changed, e.g. sold).
 	const eligibleItems = useMemo(
 		() =>
 			items.filter(
 				(item) =>
-					item.itemStatus === "approved" || selectedItemIds.includes(item._id),
+					item.itemStatus === "approved" ||
+					item.itemStatus === "available" ||
+					selectedItemIds.includes(item._id),
 			),
 		[items, selectedItemIds],
 	);
@@ -489,7 +505,7 @@ export default function DropsPage() {
 								<p className="text-sm text-muted-foreground">
 									{itemSearch
 										? "No bags match your search."
-										: "No approved bags available."}
+										: "No approved or available bags."}
 								</p>
 							)}
 							{filteredItems.map((item) => (
