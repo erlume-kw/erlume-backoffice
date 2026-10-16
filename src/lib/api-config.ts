@@ -67,6 +67,8 @@ export const endpoints = {
 	creditcards: `${API_BASE_URL}/creditcards`,
 	reviews: `${API_BASE_URL}/reviews`,
 	drops: `${API_BASE_URL}/drops`,
+	/** Homepage banners — GET public (admins also get hidden ones), writes admin-only */
+	banners: `${API_BASE_URL}/banners`,
 	demands: `${API_BASE_URL}/demands`,
 	discountcodes: `${API_BASE_URL}/discount-codes`,
 	outfits: `${API_BASE_URL}/outfits`,

@@ -3,6 +3,7 @@ import { API_BASE_URL } from "./api-config";
 import { getToken, getRefreshToken, setAuth, clearAuth, getUser } from "./auth";
 import type {
 	AuditLog,
+	Banner,
 	CreditCard,
 	DiscountCode,
 	Employee,
@@ -337,6 +338,7 @@ export const restApi = {
 			apiRequest(`${endpoints.reviews}/seller/${sellerId}`),
 	},
 	drops: createCrudApi(endpoints.drops),
+	banners: createCrudApi<Banner>(endpoints.banners),
 	demands: {
 		...createCrudApi(endpoints.demands),
 		/** GET /api/demands/subcategory/:subCategoryId — get demands by subcategory ID */
@@ -650,7 +652,7 @@ export default restApi;
 
 // ─── File upload ──────────────────────────────────────────────────────────────
 
-export type UploadFolder = "items" | "receipts" | "price-estimators" | "quotes" | "drops" | "outfits";
+export type UploadFolder = "items" | "receipts" | "price-estimators" | "quotes" | "drops" | "outfits" | "banners";
 
 export async function uploadFile(
 	file: File,

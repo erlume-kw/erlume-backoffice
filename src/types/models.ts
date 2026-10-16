@@ -126,6 +126,23 @@ export interface Drop {
 	updatedAt: string;
 }
 
+export interface Banner {
+	_id: string;
+	/** Position on the homepage carousel — 1 shows first. Unique. */
+	order: number;
+	imageUrl: string;
+	description: string;
+	descriptionAr?: string;
+	ctaLabel: string;
+	ctaLabelAr?: string;
+	/** Where the button goes, e.g. /drops, /sell, or a full https:// link. */
+	ctaUrl: string;
+	showCta: boolean;
+	isVisible: boolean;
+	createdAt: string;
+	updatedAt: string;
+}
+
 export interface Demand {
 	_id: string;
 	demand_name: string;

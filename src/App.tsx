@@ -19,6 +19,7 @@ const ExpensesPage = lazy(() => import("./pages/ExpensesPage"));
 const EmployeesPage = lazy(() => import("./pages/EmployeesPage"));
 const CategoriesPage = lazy(() => import("./pages/CategoriesPage"));
 const DropsPage = lazy(() => import("./pages/DropsPage"));
+const BannersPage = lazy(() => import("./pages/BannersPage"));
 const DiscountsPage = lazy(() => import("./pages/DiscountsPage"));
 const ReviewsPage = lazy(() => import("./pages/ReviewsPage"));
 const SubCategoriesPage = lazy(() => import("./pages/SubCategoriesPage"));
@@ -62,6 +63,7 @@ const App = () => (
 							<Route path="/employees" element={protect(<EmployeesPage />)} />
 							<Route path="/categories" element={protect(<CategoriesPage />)} />
 							<Route path="/drops" element={protect(<DropsPage />)} />
+							<Route path="/banners" element={protect(<BannersPage />)} />
 							<Route path="/discounts" element={protect(<DiscountsPage />)} />
 							<Route path="/reviews" element={protect(<ReviewsPage />)} />
 							<Route path="/subcategories" element={protect(<SubCategoriesPage />)} />
