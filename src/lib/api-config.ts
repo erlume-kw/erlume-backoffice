@@ -13,12 +13,23 @@ export type EnvName = keyof typeof ENVIRONMENTS;
 
 const ENV_STORAGE_KEY = "API_BASE_URL";
 
+// On the deployed backoffice only the two real backends are accepted — a stale
+// saved value or a build env pointing at localhost would otherwise make every
+// request (login included) fail against the CSP. Local dev (vite on localhost)
+// may still use anything, e.g. http://localhost:3000/api.
+const isLocalDev = typeof window !== "undefined" && /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname);
+const KNOWN_BASES: string[] = Object.values(ENVIRONMENTS);
+const usable = (url: string | null | undefined): url is string =>
+	!!url && (isLocalDev || KNOWN_BASES.includes(url.replace(/\/+$/, "")));
+
 function resolveApiBase(): string {
 	try {
 		const saved = localStorage.getItem(ENV_STORAGE_KEY);
-		if (saved) return saved;
+		if (usable(saved)) return saved;
+		if (saved) localStorage.removeItem(ENV_STORAGE_KEY); // drop a stale/localhost choice
 	} catch { /* storage blocked */ }
-	return (import.meta.env.VITE_API_BASE_URL as string) || ENVIRONMENTS.dev;
+	const built = import.meta.env.VITE_API_BASE_URL as string | undefined;
+	return usable(built) ? built : ENVIRONMENTS.dev;
 }
 
 const RAW_API_BASE_URL = resolveApiBase();
