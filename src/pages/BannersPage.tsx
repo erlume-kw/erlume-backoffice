@@ -27,6 +27,7 @@ type FormState = {
 	ctaLabelAr: string;
 	ctaUrl: string;
 	showCta: boolean;
+	contentAlign: "auto" | "left" | "right";
 	isVisible: boolean;
 };
 
@@ -38,6 +39,7 @@ const emptyForm: FormState = {
 	ctaLabelAr: "",
 	ctaUrl: "",
 	showCta: true,
+	contentAlign: "auto",
 	isVisible: true,
 };
 
@@ -80,6 +82,7 @@ export default function BannersPage() {
 			ctaLabelAr: b.ctaLabelAr ?? "",
 			ctaUrl: b.ctaUrl ?? "",
 			showCta: b.showCta,
+			contentAlign: b.contentAlign ?? "auto",
 			isVisible: b.isVisible,
 		});
 		setFormError(null);
@@ -112,6 +115,7 @@ export default function BannersPage() {
 			ctaLabelAr: form.ctaLabelAr.trim(),
 			ctaUrl: form.ctaUrl.trim(),
 			showCta: form.showCta,
+			contentAlign: form.contentAlign,
 			isVisible: form.isVisible,
 		};
 		setSaving(true);
@@ -324,6 +328,26 @@ export default function BannersPage() {
 							</div>
 						</>
 					)}
+
+					<div className="space-y-2">
+						<Label>Text &amp; button side</Label>
+						<div className="flex overflow-hidden rounded-md border text-sm">
+							{([
+								["auto", "Auto (by language)"],
+								["left", "Left"],
+								["right", "Right"],
+							] as const).map(([value, label]) => (
+								<button
+									key={value}
+									type="button"
+									onClick={() => set("contentAlign", value)}
+									className={`flex-1 px-3 py-2 ${form.contentAlign === value ? "bg-primary text-primary-foreground font-medium" : "text-muted-foreground hover:bg-muted"}`}>
+									{label}
+								</button>
+							))}
+						</div>
+						<p className="text-xs text-muted-foreground">Auto puts text on the left in English and the right in Arabic. Left/Right force one side for both languages.</p>
+					</div>
 
 					<div className="flex items-center justify-between rounded-lg border p-3">
 						<div>

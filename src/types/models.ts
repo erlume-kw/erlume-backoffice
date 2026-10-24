@@ -138,6 +138,8 @@ export interface Banner {
 	/** Where the button goes, e.g. /drops, /sell, or a full https:// link. */
 	ctaUrl: string;
 	showCta: boolean;
+	/** Side for the description + CTA. "auto" follows language (EN→left, AR→right). */
+	contentAlign?: "auto" | "left" | "right";
 	isVisible: boolean;
 	createdAt: string;
 	updatedAt: string;
