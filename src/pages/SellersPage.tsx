@@ -1664,6 +1664,17 @@ export default function SellersPage() {
 									/>
 								</div>
 								<div className="space-y-2">
+									<Label>Policy version</Label>
+									<Input
+										value={editingSeller?.sellerPolicyVersion || "—"}
+										readOnly
+										disabled
+									/>
+									<p className="text-xs text-muted-foreground">
+										Set automatically to the current policy edition when the acceptance date is saved.
+									</p>
+								</div>
+								<div className="space-y-2">
 									<Label>Items</Label>
 									<Input
 										value={itemSearch}
