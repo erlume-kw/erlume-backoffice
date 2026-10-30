@@ -43,6 +43,8 @@ export interface Seller {
 	preferredLanguage?: "en" | "ar";
 	intakeTimestamp?: string;
 	sellerPolicyAcceptedAt?: string;
+	/** Published policy edition (e.g. "2026-10") the seller accepted. */
+	sellerPolicyVersion?: string;
 	escalationStatus?: string;
 	escalationNotes?: string;
 	onboardingStatus?: string;

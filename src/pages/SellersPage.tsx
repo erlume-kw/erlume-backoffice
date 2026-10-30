@@ -1267,6 +1267,16 @@ export default function SellersPage() {
 									{selectedSeller.consentGiven ? "Yes" : "No"}
 								</p>
 							</div>
+							<div className="p-3 bg-muted/30 rounded-lg">
+								<div className="flex items-center gap-2 mb-1">
+									<span className="text-sm text-muted-foreground">
+										Policy Version
+									</span>
+								</div>
+								<p className="text-base font-medium text-foreground">
+									{selectedSeller.sellerPolicyVersion || "—"}
+								</p>
+							</div>
 							{(selectedSeller.onboardingStatus ||
 								selectedSeller.itemsOnboardingStatus) && (
 								<>
