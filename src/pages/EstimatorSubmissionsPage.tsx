@@ -3,7 +3,7 @@ import { AdminLayout } from "@/components/layout/AdminLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable, Column } from "@/components/common/DataTable";
 import { FilterBar } from "@/components/common/FilterBar";
-import { Camera } from "lucide-react";
+import { Camera, MessageCircle } from "lucide-react";
 import type { EstimatorSubmission } from "@/types/models";
 import { restApi } from "@/lib/rest-client";
 import { useResourceList } from "@/hooks/use-resource-list";
@@ -20,6 +20,7 @@ const conditionLabel: Record<string, string> = {
 interface SubmissionFilters {
 	accepted?: string;
 	usedPhotoAI?: string;
+	contacted?: string;
 }
 
 export default function EstimatorSubmissionsPage() {
@@ -43,6 +44,8 @@ export default function EstimatorSubmissionsPage() {
 			if (filters.accepted === "declined" && s.accept !== false) return false;
 			if (filters.usedPhotoAI === "yes" && !s.usedPhotoAI) return false;
 			if (filters.usedPhotoAI === "no" && s.usedPhotoAI) return false;
+			if (filters.contacted === "yes" && !s.contactedWhatsApp) return false;
+			if (filters.contacted === "no" && s.contactedWhatsApp) return false;
 			if (!term) return true;
 			return Boolean(
 				s.brand?.toLowerCase().includes(term) ||
@@ -57,7 +60,8 @@ export default function EstimatorSubmissionsPage() {
 	const stats = useMemo(() => {
 		const list = Array.isArray(subs) ? subs : [];
 		const accepted = list.filter((s) => s.accept === true).length;
-		return { total: list.length, accepted, declined: list.length - accepted };
+		const contacted = list.filter((s) => s.contactedWhatsApp).length;
+		return { total: list.length, accepted, declined: list.length - accepted, contacted };
 	}, [subs]);
 
 	const columns: Column<EstimatorSubmission>[] = [
@@ -111,7 +115,7 @@ export default function EstimatorSubmissionsPage() {
 					</span>
 				) : (
 					<span className="rounded bg-emerald-100 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-emerald-700">
-						Accepted
+						Might qualify
 					</span>
 				),
 		},
@@ -130,6 +134,13 @@ export default function EstimatorSubmissionsPage() {
 							className="inline-flex items-center gap-1 text-[10px] text-muted-foreground"
 							title="Used the AI photo auto-fill">
 							<Camera className="h-3 w-3" /> AI
+						</span>
+					)}
+					{s.contactedWhatsApp && (
+						<span
+							className="inline-flex items-center gap-1 rounded bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700"
+							title="Clicked through to WhatsApp after the estimate">
+							<MessageCircle className="h-3 w-3" /> Messaged
 						</span>
 					)}
 				</div>
@@ -162,11 +173,15 @@ export default function EstimatorSubmissionsPage() {
 					</div>
 					<div className="rounded-lg border bg-card px-4 py-3">
 						<p className="text-2xl font-semibold text-emerald-600">{stats.accepted}</p>
-						<p className="text-xs text-muted-foreground uppercase tracking-wide">Accepted</p>
+						<p className="text-xs text-muted-foreground uppercase tracking-wide">Might qualify</p>
 					</div>
 					<div className="rounded-lg border bg-card px-4 py-3">
 						<p className="text-2xl font-semibold text-muted-foreground">{stats.declined}</p>
 						<p className="text-xs text-muted-foreground uppercase tracking-wide">Below min</p>
+					</div>
+					<div className="rounded-lg border bg-card px-4 py-3">
+						<p className="text-2xl font-semibold text-green-600">{stats.contacted}</p>
+						<p className="text-xs text-muted-foreground uppercase tracking-wide">Messaged on WhatsApp</p>
 					</div>
 				</div>
 
@@ -184,7 +199,7 @@ export default function EstimatorSubmissionsPage() {
 							label: "Result",
 							value: filters.accepted,
 							options: [
-								{ value: "accepted", label: "Accepted" },
+								{ value: "accepted", label: "Might qualify" },
 								{ value: "declined", label: "Below min" },
 							],
 						},
@@ -195,6 +210,15 @@ export default function EstimatorSubmissionsPage() {
 							options: [
 								{ value: "yes", label: "Used AI" },
 								{ value: "no", label: "Manual" },
+							],
+						},
+						{
+							key: "contacted",
+							label: "WhatsApp",
+							value: filters.contacted,
+							options: [
+								{ value: "yes", label: "Messaged" },
+								{ value: "no", label: "No message" },
 							],
 						},
 					]}

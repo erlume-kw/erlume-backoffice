@@ -470,6 +470,7 @@ export interface EstimatorSubmission {
 	pickupFee?: number;
 	accept?: boolean;
 	locale?: string;
+	contactedWhatsApp?: boolean;
 	createdAt: string;
 	updatedAt: string;
 }
