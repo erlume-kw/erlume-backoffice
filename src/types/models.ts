@@ -445,3 +445,31 @@ export interface Quote {
 	createdAt: string;
 	updatedAt: string;
 }
+
+/**
+ * A public website pricing-estimator submission. Captured automatically when a
+ * visitor runs an estimate on the storefront. Read-only here — never created or
+ * edited from the backoffice. Separate from the staff price-log / comp database.
+ */
+export interface EstimatorSubmission {
+	_id: string;
+	id?: string;
+	brand: string;
+	model?: string;
+	size?: string;
+	material?: string;
+	color?: string;
+	condition?: string;
+	brandTier?: string;
+	originalPrice?: number;
+	yearPurchased?: number;
+	usedPhotoAI?: boolean;
+	listingPrice?: number;
+	sellerPayout?: number;
+	erlumeCut?: number;
+	pickupFee?: number;
+	accept?: boolean;
+	locale?: string;
+	createdAt: string;
+	updatedAt: string;
+}

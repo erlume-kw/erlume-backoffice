@@ -22,6 +22,7 @@ import {
 	Truck,
 	Mail,
 	History,
+	Calculator,
 	LogOut,
 	Server,
 } from "lucide-react";
@@ -37,6 +38,7 @@ const navigation = [
 	{ name: "Users", href: "/users", icon: Users },
 	{ name: "Sellers", href: "/sellers", icon: Store },
 	{ name: "Quotes", href: "/quotes", icon: FileSignature },
+	{ name: "Estimator Uses", href: "/estimator-submissions", icon: Calculator },
 	{ name: "Items", href: "/items", icon: Package },
 	{ name: "Orders", href: "/orders", icon: ShoppingCart },
 	{ name: "Transactions", href: "/transactions", icon: CreditCard },

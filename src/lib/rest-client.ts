@@ -7,6 +7,7 @@ import type {
 	CreditCard,
 	DiscountCode,
 	Employee,
+	EstimatorSubmission,
 	Expense,
 	Income,
 	NewsletterSubscriber,
@@ -645,6 +646,13 @@ export const restApi = {
 	auditLogs: {
 		getAll: (params?: { model?: string; action?: string; userId?: string; limit?: number }) =>
 			apiRequest<AuditLog[]>(`${endpoints.auditLogs}${buildQuery(params ?? {})}`),
+	},
+	/** Public website pricing-estimator usage log. Admin, read-only. */
+	estimatorSubmissions: {
+		getAll: (params?: { limit?: number; accepted?: boolean }) =>
+			apiRequest<EstimatorSubmission[]>(
+				`${endpoints.estimatorSubmissions}${buildQuery(params ?? {})}`,
+			),
 	},
 };
 

@@ -96,4 +96,6 @@ export const endpoints = {
 	auditLogs: `${API_BASE_URL}/audit-logs`,
 	/** GET /api/pricing-tool/quotes — consignment quote records (admin only) */
 	quotes: `${API_BASE_URL}/pricing-tool/quotes`,
+	/** GET /api/estimator-submissions — public website estimator usage log (admin only) */
+	estimatorSubmissions: `${API_BASE_URL}/estimator-submissions`,
 } as const;
