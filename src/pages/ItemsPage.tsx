@@ -29,7 +29,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Tag } from "lucide-react";
 import { restApi } from "@/lib/rest-client";
-import { formatApiError } from "@/lib/error-utils";
+import { formatApiError, getFieldErrors } from "@/lib/error-utils";
 import { getEnumOptions, getEnumValues } from "@/lib/enums";
 import { useResourceList } from "@/hooks/use-resource-list";
 
@@ -60,6 +60,39 @@ export default function ItemsPage() {
 	const [formBrand, setFormBrand] = useState("");
 	const [brandSearch, setBrandSearch] = useState("");
 	const [formError, setFormError] = useState<string | null>(null);
+	// Per-field validation errors, keyed by the payload field name (itemName,
+	// brandName, basePrice, …). Drives the inline messages + red borders and the
+	// jump-to-first-bad-step behaviour. Server-side validation details are mapped
+	// into the same shape so a rejected save highlights the exact fields too.
+	const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+	const clearFieldError = (name: string) =>
+		setFieldErrors((prev) => {
+			if (!prev[name]) return prev;
+			const next = { ...prev };
+			delete next[name];
+			return next;
+		});
+	const fieldErrorText = (name: string) =>
+		fieldErrors[name] ? (
+			<p className="text-xs text-destructive mt-1">{fieldErrors[name]}</p>
+		) : null;
+	const errorBorder = (name: string) =>
+		fieldErrors[name] ? "border-destructive focus-visible:ring-destructive" : undefined;
+	// Which wizard step each field lives on — so a validation failure can jump the
+	// user to the first step that has an error.
+	const FIELD_STEP: Record<string, number> = {
+		itemName: 1,
+		brandName: 1,
+		category_id: 1,
+		basePrice: 2,
+		itemStatus: 2,
+		quantity: 2,
+		listingPrice: 2,
+		condition: 3,
+		size: 3,
+		color: 3,
+		imageUrls: 5,
+	};
 	const [formImageUrls, setFormImageUrls] = useState<string[]>([]);
 	const [formMainImageUrl, setFormMainImageUrl] = useState<string>("");
 	const [formReceiptUrls, setFormReceiptUrls] = useState<string[]>([]);
@@ -530,30 +563,38 @@ export default function ItemsPage() {
 		});
 
 		setFormError(null);
-		const hasAllRequired =
-			itemNameVal &&
-			brandNameVal &&
-			basePrice &&
-			formStatus &&
-			formCondition &&
-			colorVal &&
-			sizeVal &&
-			quantity &&
-			formCategoryId &&
-			listingPriceValue &&
-			payload.uploadedAt;
-		if (!hasAllRequired) {
-			setFormError(
-				"Please fill in all required fields (name, brand, price, status, condition, color, size, quantity, category, listing price).",
-			);
+
+		// Per-field client-side validation → inline messages, not one lumped banner.
+		const errors: Record<string, string> = {};
+		if (!itemNameVal) errors.itemName = "Item name is required.";
+		if (!brandNameVal) errors.brandName = "Select a brand.";
+		if (!formCategoryId) errors.category_id = "Select a category.";
+		if (!basePrice) errors.basePrice = "Base price is required.";
+		else if (Number.isNaN(Number(basePrice)) || Number(basePrice) < 0)
+			errors.basePrice = "Enter a valid price (0 or more).";
+		if (!formStatus) errors.itemStatus = "Select a status.";
+		if (!quantity) errors.quantity = "Quantity is required.";
+		else if (!Number.isInteger(Number(quantity)) || Number(quantity) < 1)
+			errors.quantity = "Enter a whole number of 1 or more.";
+		if (!listingPriceValue) errors.listingPrice = "Listing price is required.";
+		else if (Number.isNaN(Number(listingPriceValue)) || Number(listingPriceValue) < 0)
+			errors.listingPrice = "Enter a valid price (0 or more).";
+		if (!formCondition) errors.condition = "Select a condition.";
+		if (!sizeVal) errors.size = "Size is required.";
+		if (!colorVal) errors.color = "Color is required.";
+		if (imageUrls.length === 0) errors.imageUrls = "Add at least one image.";
+
+		if (Object.keys(errors).length > 0) {
+			setFieldErrors(errors);
+			setFormError("Please fix the highlighted fields below.");
+			// Jump to the first step that has an error so it's actually visible.
+			const steps = Object.keys(errors)
+				.map((k) => FIELD_STEP[k])
+				.filter((s): s is number => typeof s === "number");
+			if (steps.length) setFormStep(Math.min(...steps));
 			return;
 		}
-		if (imageUrls.length === 0) {
-			setFormError(
-				"Please add at least one image URL (e.g. Google Drive link).",
-			);
-			return;
-		}
+		setFieldErrors({});
 
 		try {
 			if (editingItem) {
@@ -571,8 +612,25 @@ export default function ItemsPage() {
 			setFormBrand("");
 			setBrandSearch("");
 			setFormError(null);
+			setFieldErrors({});
 		} catch (err) {
-			setFormError(formatApiError(err) || "Failed to save item");
+			// Map server-side validation details to the same per-field errors.
+			const serverFieldErrors = getFieldErrors(err);
+			if (Object.keys(serverFieldErrors).length > 0) {
+				setFieldErrors(serverFieldErrors);
+				const unmapped = Object.keys(serverFieldErrors).filter((k) => !(k in FIELD_STEP));
+				setFormError(
+					unmapped.length
+						? formatApiError(err) // some fields have no matching input — show them in the banner
+						: "Please fix the highlighted fields below.",
+				);
+				const steps = Object.keys(serverFieldErrors)
+					.map((k) => FIELD_STEP[k])
+					.filter((s): s is number => typeof s === "number");
+				if (steps.length) setFormStep(Math.min(...steps));
+			} else {
+				setFormError(formatApiError(err) || "Failed to save item");
+			}
 			console.error("Failed to save item", err);
 		}
 	};
@@ -592,6 +650,7 @@ export default function ItemsPage() {
 					setFormAuthenticatedAt(undefined);
 					setFormReturnDate(undefined);
 					setFormError(null);
+					setFieldErrors({});
 					setFormStep(1);
 					setFormCondition("gently_used");
 					setFormStatus("available");
@@ -1074,6 +1133,7 @@ export default function ItemsPage() {
 										: undefined,
 								);
 								setFormError(null);
+								setFieldErrors({});
 								setFormStep(1);
 								setFormCondition(selectedItem.condition);
 								setFormBrand(selectedItem.brandName ?? "");
@@ -1102,6 +1162,7 @@ export default function ItemsPage() {
 					setFormAuthenticatedAt(undefined);
 					setFormReturnDate(undefined);
 					setFormError(null);
+					setFieldErrors({});
 					setFormSellerId("");
 					setSellerSearch("");
 					setFormCategoryId("");
@@ -1188,7 +1249,8 @@ export default function ItemsPage() {
 										name="itemName"
 										defaultValue={editingItem?.itemName}
 										placeholder="Classic Jacket"
-									/>
+									 aria-invalid={!!fieldErrors.itemName} className={errorBorder("itemName")} onChange={() => clearFieldError("itemName")} />
+										{fieldErrorText("itemName")}
 								</div>
 								<div className="space-y-2">
 									<Label>Brand</Label>
@@ -1211,12 +1273,13 @@ export default function ItemsPage() {
 									<Select
 										value={formBrand || "__placeholder__"}
 										onValueChange={(v) =>
-											setFormBrand(v === "__placeholder__" ? "" : v)
+											{ setFormBrand(v === "__placeholder__" ? "" : v); clearFieldError("brandName"); }
 										}
 										disabled={brandLoading}>
-										<SelectTrigger>
+										<SelectTrigger className={errorBorder("brandName")}>
 											<SelectValue placeholder="Select brand" />
 										</SelectTrigger>
+											{fieldErrorText("brandName")}
 										<SelectContent>
 											<SelectItem value="__placeholder__">
 												Select brand
@@ -1250,11 +1313,13 @@ export default function ItemsPage() {
 												setFormCategoryId(
 													value === "__placeholder__" ? "" : value,
 												);
+												clearFieldError("category_id");
 												setFormSubCategoryId(undefined);
 											}}>
-											<SelectTrigger>
+											<SelectTrigger className={errorBorder("category_id")}>
 												<SelectValue placeholder="Select category" />
 											</SelectTrigger>
+											{fieldErrorText("category_id")}
 											<SelectContent>
 												<SelectItem value="__placeholder__">
 													Select category
@@ -1319,7 +1384,8 @@ export default function ItemsPage() {
 											min="0"
 											defaultValue={editingItem?.basePrice}
 											placeholder="e.g. 90"
-										/>
+										 aria-invalid={!!fieldErrors.basePrice} className={errorBorder("basePrice")} onChange={() => clearFieldError("basePrice")} />
+										{fieldErrorText("basePrice")}
 									</div>
 									<div className="space-y-2">
 										<Label htmlFor="saleRate">Seller share (auto)</Label>
@@ -1343,10 +1409,11 @@ export default function ItemsPage() {
 													? formStatus
 													: (itemStatusValues[0] ?? "available")
 											}
-											onValueChange={(value) => setFormStatus(value)}>
-											<SelectTrigger>
+											onValueChange={(value) => { setFormStatus(value); clearFieldError("itemStatus"); }}>
+											<SelectTrigger className={errorBorder("itemStatus")}>
 												<SelectValue placeholder="Select status" />
 											</SelectTrigger>
+											{fieldErrorText("itemStatus")}
 											<SelectContent>
 												{itemStatusOptions.map(({ value, label }) => (
 													<SelectItem key={value} value={value}>
@@ -1366,7 +1433,8 @@ export default function ItemsPage() {
 											step="1"
 											defaultValue={editingItem?.quantity}
 											placeholder="e.g. 3"
-										/>
+										 aria-invalid={!!fieldErrors.quantity} className={errorBorder("quantity")} onChange={() => clearFieldError("quantity")} />
+										{fieldErrorText("quantity")}
 									</div>
 								</div>
 								<div className="space-y-2 max-w-xs">
@@ -1381,7 +1449,8 @@ export default function ItemsPage() {
 										required
 										defaultValue={editingItem?.listingPrice ?? ""}
 										placeholder="e.g. 90"
-									/>
+									 aria-invalid={!!fieldErrors.listingPrice} className={errorBorder("listingPrice")} onChange={() => clearFieldError("listingPrice")} />
+										{fieldErrorText("listingPrice")}
 								</div>
 							</div>
 
@@ -1397,10 +1466,11 @@ export default function ItemsPage() {
 													? formCondition
 													: (itemConditionValues[0] ?? "gently_used")
 											}
-											onValueChange={(value) => setFormCondition(value)}>
-											<SelectTrigger>
+											onValueChange={(value) => { setFormCondition(value); clearFieldError("condition"); }}>
+											<SelectTrigger className={errorBorder("condition")}>
 												<SelectValue placeholder="Select condition" />
 											</SelectTrigger>
+											{fieldErrorText("condition")}
 											<SelectContent>
 												{itemConditionOptions.map(({ value, label }) => (
 													<SelectItem key={value} value={value}>
@@ -1417,7 +1487,8 @@ export default function ItemsPage() {
 											name="size"
 											defaultValue={editingItem?.size}
 											placeholder="M"
-										/>
+										 aria-invalid={!!fieldErrors.size} className={errorBorder("size")} onChange={() => clearFieldError("size")} />
+										{fieldErrorText("size")}
 									</div>
 								</div>
 								<div className="grid grid-cols-2 gap-4">
@@ -1428,7 +1499,8 @@ export default function ItemsPage() {
 											name="color"
 											defaultValue={editingItem?.color}
 											placeholder="Black"
-										/>
+										 aria-invalid={!!fieldErrors.color} className={errorBorder("color")} onChange={() => clearFieldError("color")} />
+										{fieldErrorText("color")}
 									</div>
 									<div className="space-y-2">
 										<Label htmlFor="itemModel">Model</Label>
@@ -1526,6 +1598,7 @@ export default function ItemsPage() {
 												defaultUrls={formImageUrls}
 												onChange={(urls) => {
 													setFormImageUrls(urls);
+													clearFieldError("imageUrls");
 													if (formMainImageUrl && !urls.includes(formMainImageUrl)) {
 														setFormMainImageUrl(urls[0] ?? "");
 													}
@@ -1534,6 +1607,7 @@ export default function ItemsPage() {
 												accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif"
 												label="Upload images"
 											/>
+												{fieldErrorText("imageUrls")}
 											{formImageUrls.length > 1 && (
 												<div className="space-y-1.5">
 													<p className="text-xs text-muted-foreground">Tap an image to set it as the cover photo</p>
