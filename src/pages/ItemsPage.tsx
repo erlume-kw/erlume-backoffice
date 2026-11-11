@@ -1174,7 +1174,7 @@ export default function ItemsPage() {
 				title={editingItem ? "Edit Item" : "Add Item"}
 				type="dialog"
 				size="lg">
-				<form className="flex flex-col gap-4" onSubmit={handleSubmit}>
+				<form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
 					<>
 						{formError && (
 							<div className="text-sm text-destructive rounded-md bg-destructive/10 p-2">
@@ -1446,7 +1446,6 @@ export default function ItemsPage() {
 										inputMode="decimal"
 										step="any"
 										min="0"
-										required
 										defaultValue={editingItem?.listingPrice ?? ""}
 										placeholder="e.g. 90"
 									 aria-invalid={!!fieldErrors.listingPrice} className={errorBorder("listingPrice")} onChange={() => clearFieldError("listingPrice")} />
